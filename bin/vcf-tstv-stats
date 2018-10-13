@@ -1,0 +1,136 @@
+#!/usr/bin/env perl
+
+#
+# Copyright 2018 Luciano Xumerle. All rights reserved.
+# Luciano Xumerle <luciano.xumerle@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+
+my $cmd = $0;
+$cmd =~ s/^.*\///;
+print STDERR
+  qq{---------------------------------------------------------------------------
+$cmd version 0.0.1 (Oct 13, 2018)
+Copyright 2018 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+This is free software; see the source for copying conditions. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+---------------------------------------------------------------------------
+
+SYNTAX:
+
+ > $cmd <file.vcf[.gz]>
+
+};
+
+if ( defined $ARGV[0] && -f $ARGV[0] && $ARGV[0] =~ m/\.vcf/i )
+{
+    my $dest = $ARGV[0];
+    $dest =~ s/\.vcf.*/.stats.tsv/;
+    my $name = $ARGV[0];
+    $name =~ s/^.*\///;
+    $name =~ s/.vcf.*//;
+
+   # hash -> sample -> key = sums where key == genotype ot multi or tot or indel
+    my $stats  = {};
+    my @header = ();
+
+    if ( $ARGV[0] =~ m/gz$/i )
+    {
+        open( FILE, "gunzip -dc $ARGV[0] |" ) || die;
+    }
+    else
+    {
+        open( FILE, $ARGV[0] ) || die;
+    }
+
+    #
+    # from here until final output is almost equal to original code
+    #
+    my $n            = 0;
+    my $multiallelic = 0;
+
+    while ( my $line = <FILE> )
+    {
+        chomp $line;
+
+        # save the header
+        if ( $line =~ m/#CHROM/ )
+        {
+            @header = split /\t/, $line;
+            next;
+        }
+
+        # keep only the variant PASSing the filter
+        next if ( $line !~ m/\tPASS\t/ );
+
+        my @a = split /\t/, $line;
+
+        my @alleles = split ',', $a[3] . ',' . $a[4];
+
+        for ( my $i = 9 ; $i <= $#a ; $i++ )
+        {
+            my $gt = $a[$i];
+            $gt =~ s/:.*$//;
+
+            # correct strelka GT
+            $gt = $gt . '/' . $gt if ( length($gt) == 1 );
+
+            # next is gt is not valid (./.) or is omoref (0/0)
+            if ( $gt =~ m/[123456789]/ )
+            {
+                my @gg = sort { $a <=> $b } split /[\/\|]/, $gt;
+                my $geno = $alleles[0] . $alleles[ $gg[1] ];
+                $$stats{ $header[$i] }->{'tot'}++;
+
+                next if ( length($geno) > 2 );
+
+                $$stats{ $header[$i] }->{'multi'}++ if ( $a[4] =~ m/,/ );
+                $$stats{ $header[$i] }->{$geno}++;
+            }
+        }
+    }
+    close FILE;
+
+    open( OUT, ">$dest" ) || die;
+    for ( my $i = 9 ; $i <= $#header ; $i++ )
+    {
+        my $ts = 0;
+        foreach my $mut ( 'AG', 'GA', 'CT', 'TC' )
+        {
+            $ts += $$stats{ $header[$i] }->{$mut}
+              if ( defined $$stats{ $header[$i] }->{$mut} );
+        }
+
+        my $tv = 0;
+        foreach my $mut ( 'AC', 'CA', 'GT', 'TG', 'AT', 'TA', 'CG', 'GC' )
+        {
+            $tv += $$stats{ $header[$i] }->{$mut}
+              if ( defined $$stats{ $header[$i] }->{$mut} );
+        }
+        my $ratio = $tv ? $ts / $tv : 0;
+
+        my $n = $$stats{ $header[$i] }->{'tot'};
+        printf OUT $header[$i] . qq|\t%d\t%d\t%d\t%.2f\n|, $n, $ts + $tv,
+          $n - $ts - $tv, $ratio;
+    }
+    close OUT;
+}
+else
+{
+    print STDERR qq|NO vcf file in input\n|;
+}

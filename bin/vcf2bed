@@ -1,0 +1,64 @@
+#!/usr/bin/perl
+
+#
+# Copyright 2018 Luciano Xumerle. All rights reserved.
+# Luciano Xumerle <luciano.xumerle@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+
+my $cmd = $0;
+$cmd =~ s/^.*\///;
+print STDERR
+  qq{---------------------------------------------------------------------------
+$cmd version 0.0.1 (Oct 13, 2018)
+Copyright 2018 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+This is free software; see the source for copying conditions. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+---------------------------------------------------------------------------
+
+SYNTAX:
+
+ > cat file.vcf | $cmd
+
+};
+
+while (<STDIN>)
+{
+    chomp;
+    next if (m/^#/);
+
+    my @a = split /\t/;
+
+    $a[0] =~ s/MT/M/;
+
+    $a[0] =~ s/^/chr/ if ( $a[0] !~ /^chr/ );
+
+    my $chr = shift @a;
+
+    unshift @a, $a[0] - 1;
+
+    my $length = 1;
+    foreach my $b ( split ',', $a[3] . ',' . $a[4] )
+    {
+        $b = length $b;
+        $length = $b if ( $b > $length );
+    }
+    $a[1] = $a[0] + $length;
+
+    print join( "\t", $chr, @a ), "\n";
+}
