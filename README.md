@@ -35,6 +35,14 @@ Sometimes I need to convert a VCF file to a BED format.
 The script prints a table with the number of variants (SNV and indel)
 and the ts/tv ratio. It works with multisample VCF too.
 
+### insertSize
+
+Calcute the BAM insert.
+It uses the **pairend\_distro.py** from the **lumpy-sv** package.
+I renamed the script to **pairend\_distro\_biolucxum.py** to avoid possible conflict
+eith the **lumpy-sv** package.
+
+
 ### genderPredictor
 
 I wrote this utility to verify the gender in one or more BAM files.

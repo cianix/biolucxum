@@ -1,0 +1,60 @@
+#!/usr/bin/perl
+
+#
+# Copyright 2018 Luciano Xumerle. All rights reserved.
+# Luciano Xumerle <luciano.xumerle@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+
+my $cmd = $0;
+$cmd =~ s/^.*\///;
+print STDERR
+  qq{---------------------------------------------------------------------------
+$cmd version 0.0.1 (Oct 13, 2018)
+Copyright 2018 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+This is free software; see the source for copying conditions. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+---------------------------------------------------------------------------
+SYNTAX:
+ - $cmd <read_lengh_no_150> <bam1> [bam2] ... [bamN]
+
+};
+
+my $SAMTOOLS = 'samtools';
+
+my $LUMPY = $0;
+$LUMPY =~ s/insertSize$/pairend_distro_biolucxum.py/;
+
+my $read = 150;
+
+my @bam = ();
+
+foreach my $p (@ARGV)
+{
+    push @bam, $p if ( -f $p && $p =~ m/.bam$/i );
+    $read = $p if ( $p =~ m/^\d+$/i );
+}
+
+foreach my $f (@bam)
+{
+    my $command = join ' | ',
+      qq|$SAMTOOLS view $f|,
+      'tail -n+100000',
+      qq|$LUMPY -r $read -X 4 -N 10000 -o /dev/null|;
+    system($command);
+}
