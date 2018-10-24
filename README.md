@@ -37,7 +37,8 @@ and the ts/tv ratio. It works with multisample VCF too.
 
 ### insertSize
 
-Calcute the BAM insert.
+Calcute the BAM mean insert size using a subset of reads.
+
 It uses **samtools** and the **pairend\_distro.py** from the **lumpy-sv** package.
 I renamed the script to **pairend\_distro\_biolucxum.py** to avoid possible conflict
 with the **lumpy-sv** package.
