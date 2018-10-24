@@ -38,9 +38,9 @@ and the ts/tv ratio. It works with multisample VCF too.
 ### insertSize
 
 Calcute the BAM insert.
-It uses the **pairend\_distro.py** from the **lumpy-sv** package.
+It uses **samtools** and the **pairend\_distro.py** from the **lumpy-sv** package.
 I renamed the script to **pairend\_distro\_biolucxum.py** to avoid possible conflict
-eith the **lumpy-sv** package.
+with the **lumpy-sv** package.
 
 
 ### genderPredictor
