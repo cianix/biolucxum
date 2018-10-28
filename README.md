@@ -26,6 +26,11 @@ I rewrite a perl version of this program from the [gvcftools](https://github.com
 The script filter out all the VCF lines without almost a valid variant gentype
 (PASS and with a number grater than 0 in a GT field).
 
+### sampleSelected
+
+The script selects a subset of samples from the input VCF.
+It uses a txt file to set one sample ID for line and the samples order.
+
 ### vcf2bed
 
 Sometimes I need to convert a VCF file to a BED format.
