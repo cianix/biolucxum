@@ -35,6 +35,11 @@ It uses a txt file to set one sample ID for line and the samples order.
 
 Sometimes I need to convert a VCF file to a BED format.
 
+### vcf2AlleleBED
+
+To convert a VCF file to a bed file with column: chr, start, stop, allele1, allele2.
+Alleles are reported as **R** for the reference and as **A\>B** for alternative.
+
 ### vcf-tstv-stats
 
 The script prints a table with the number of variants (SNV and indel)
