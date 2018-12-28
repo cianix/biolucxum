@@ -1,0 +1,118 @@
+#!/usr/bin/perl
+#
+# Copyright 2018 Luciano Xumerle. All rights reserved.
+# Luciano Xumerle <luciano.xumerle@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+
+my $cmd = $0;
+$cmd =~ s/^.*\///;
+print STDERR
+  qq{---------------------------------------------------------------------------
+$cmd version 0.0.1 (Dec 28, 2018)
+Copyright 2018 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+This is free software; see the source for copying conditions. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+---------------------------------------------------------------------------
+SYNTAX:
+ >  $cmd <file.tsv>
+};
+
+# these are global vars used also in functions
+my @lines = ();
+my %ln    = ();
+
+&loadTSV( $ARGV[0] );
+
+&dokuwiki();
+print "\n\n";
+&markdown();
+
+sub loadTSV
+{
+    my $file = shift;
+
+    open( FILE, $file ) || die "SYNTAX:\n\n - $0 <file.tsv>\n\n";
+    while (<FILE>)
+    {
+        chomp;
+
+        my @a = split "\t", $_ . "\ta";
+        pop @a;
+
+        for ( my $i = 0 ; $i <= $#a ; $i++ )
+        {
+            $ln{$i} = length( $a[$i] )
+              if ( !defined $ln{$i} || $ln{$i} < length( $a[$i] ) );
+        }
+
+        push @lines, \@a;
+    }
+    close FILE;
+}
+
+sub markdown
+{
+    my $prima = 0;
+    my @ll    = ();
+
+    foreach my $row (@lines)
+    {
+
+        for ( my $i = 0 ; $i <= $#{$row} ; $i++ )
+        {
+            while ( length( $row->[$i] ) < $ln{$i} )
+            {
+                $row->[$i] = ' ' . $row->[$i];
+            }
+        }
+
+        print '| ' . ( join ' | ', @$row ) . ' |' . "\n";
+
+        if ( $prima < 1 )
+        {
+            my @ll = ();
+            foreach my $i ( sort { $a <=> $b } keys %ln )
+            {
+                push @ll, '-' x $ln{$i};
+            }
+            print '| ' . ( join ' | ', @ll ) . ' | ' . "\n";
+        }
+
+        $prima++;
+    }
+}
+
+sub dokuwiki
+{
+    my $prima = 0;
+
+    foreach my $r (@lines)
+    {
+
+        if ( $prima < 1 )
+        {
+            print join( '^', '', @$r, '' ), "\n";
+            $prima++;
+        }
+        else
+        {
+            print join( '|', '', @$r, '' ), "\n";
+        }
+    }
+}

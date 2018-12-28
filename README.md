@@ -60,6 +60,13 @@ I wrote this utility to verify the gender in one or more BAM files.
 The program uses the samtools idxstats to count the reads in
 chromosome X and Y and print out some coverage statistics.
 
+
+### csv2wiki
+
+The script loads a TSV file and prints out the dokuwiki table
+and the markdown table.
+
+
 ## License
 
 Copyright 2018 [Luciano Xumerle](mailto:luciano.xumerle@gmail.com)
