@@ -66,6 +66,10 @@ chromosome X and Y and print out some coverage statistics.
 The script loads a TSV file and prints out the dokuwiki table
 and the markdown table.
 
+### tex2pdf
+
+It converts latex code to a PDF image using the programs: latex, dvips and epspdf
+
 
 ## License
 
