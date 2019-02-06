@@ -61,10 +61,16 @@ The program uses the samtools idxstats to count the reads in
 chromosome X and Y and print out some coverage statistics.
 
 
+### realPath
+
+A perl replacement for the realpath(3) command.
+
+
 ### csv2wiki
 
 The script loads a TSV file and prints out the dokuwiki table
 and the markdown table.
+
 
 ### tex2pdf
 
