@@ -61,7 +61,7 @@ The program uses the samtools idxstats to count the reads in
 chromosome X and Y and print out some coverage statistics.
 
 
-### slopBED
+### bedSlop
 
 An alternative to the bedtools slopbed.
 The script manages negative slop values too.
