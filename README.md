@@ -31,6 +31,10 @@ The script filter out all the VCF lines without almost a valid variant gentype
 The script selects a subset of samples from the input VCF.
 It uses a txt file to set one sample ID for line and the samples order.
 
+### vcf2table
+
+Parse the VCF file and create a table with CHR, POSITION, REFERENCE ALLELE, ALTERNATIVE ALLELE(s), GENOTYPE(s).
+
 ### vcf2bed
 
 Sometimes I need to convert a VCF file to a BED format.
