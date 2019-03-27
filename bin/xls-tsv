@@ -1,0 +1,67 @@
+#!/usr/bin/perl
+
+#
+# Copyright 2019 Luciano Xumerle. All rights reserved.
+# Luciano Xumerle <luciano.xumerle@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+
+my $cmd = $0;
+$cmd =~ s/^.*\///;
+print STDERR
+  qq{---------------------------------------------------------------------------
+$cmd version 0.0.1 (Mar 27, 2019)
+Copyright 2019 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+This is free software; see the source for copying conditions. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+---------------------------------------------------------------------------
+SYNTAX:
+ > $cmd <file.xls[x]>
+ > $cmd <file.tsv>
+
+The program converts an Excel file to the TSV format
+or a TSV file the XLSX format using file extension.
+
+NOTE: This is a wrapper to the "ssconvert" program
+      released with gnumeric
+};
+
+foreach my $f (@ARGV)
+{
+
+    if ( -f $f )
+    {
+
+        # convert XLS[X] to TSV
+        if ( $f =~ m/\.xls(x*)$/i )
+        {
+            my $out = $f;
+            $out =~ s/\.xls(x*)$/.txt/i;
+            system( 'ssconvert', '-O', qq|separator="\t" format=raw|, $f,
+                $out );
+        }
+
+        # convert TSV to XLSX
+        if ( $f =~ m/\.tsv$/i )
+        {
+            my $out = $f;
+            $out =~ s/\.tsv$/.xlsx/i;
+            system( 'ssconvert', $f, $out );
+        }
+    }
+}

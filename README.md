@@ -88,6 +88,15 @@ and the markdown table.
 It converts latex code to a PDF image using the programs: latex, dvips and epspdf
 
 
+### xls-tsv
+
+The program converts an Excel file to the TSV format
+or a TSV file the XLSX format using file extension.
+
+**NOTE**: This is a wrapper to the *ssconvert* program
+      released with *gnumeric*.
+
+
 ## License
 
 Copyright 2018 [Luciano Xumerle](mailto:luciano.xumerle@gmail.com)
