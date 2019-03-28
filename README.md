@@ -72,6 +72,15 @@ The script manages negative slop values too.
 *There isn's a control on chromosomes lenght*.
 
 
+### printPhreadTable
+
+The program prints out the *Phred* or *Q score* values
+for the range [0..42] corresponding to the range [33..75]
+with the default *ASCII_BASE = 33*
+
+NOTE: Old Illumina fastq uses *ASCII_BASE = 64*
+
+
 ### realPath
 
 A perl replacement for the realpath(3) command.
