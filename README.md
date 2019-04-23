@@ -49,6 +49,28 @@ Alleles are reported as **R** for the reference and as **A\>B** for alternative.
 The script prints a table with the number of variants (SNV and indel)
 and the ts/tv ratio. It works with multisample VCF too.
 
+### plinkHWE2avinput
+
+The script prints out an avinput table importing a plink HWE table in
+which the variant ID column is formatted as:
+
+	CHR_STARTPOS_ENDPOS_REF_ALT
+
+Example:
+
+~~~~
+ CHR                SNP     TEST   A1   A2        GENO   O(HET)   E(HET)       P
+   1   chr1_10108_C_CCT      ALL  CCT    C       0/3/1     0.75   0.4688       1
+   1   chr1_10108_C_CCT      AFF  CCT    C       0/2/1   0.6667   0.4444       1
+   1   chr1_10108_C_CCT    UNAFF  CCT    C       0/1/0        1      0.5       1
+   1    chr1_10114_T_TA      ALL   TA    T       0/4/3   0.5714   0.4082       1
+   1    chr1_10114_T_TA      AFF   TA    T       0/0/1        0        0       1
+   1    chr1_10114_T_TA    UNAFF   TA    T       0/4/2   0.6667   0.4444       1
+   1   chr1_10145_AAC_A      ALL    A  AAC       0/1/7    0.125   0.1172       1
+   1   chr1_10145_AAC_A      AFF    A  AAC       0/1/0        1      0.5       1
+   1   chr1_10145_AAC_A    UNAFF    A  AAC       0/0/7        0        0       1
+~~~~
+
 ### insertSize
 
 Calcute the BAM mean insert size using a subset of reads.

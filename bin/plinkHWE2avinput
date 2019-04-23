@@ -1,0 +1,140 @@
+#!/usr/bin/perl
+#
+# Copyright 2018-2019 Luciano Xumerle. All rights reserved.
+# Luciano Xumerle <luciano.xumerle@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+
+my $cmd = $0;
+$cmd =~ s/^.*\///;
+print STDERR
+  qq{---------------------------------------------------------------------------
+$cmd version 0.0.1 (Apr 23, 2019)
+Copyright 2019 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+This is free software; see the source for copying conditions. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+---------------------------------------------------------------------------
+SYNTAX:
+ >  $cmd <plink.hwe>
+
+NOTE: $cmd assumes that VCF file was imported with:
+ > plink --keep-allele-order --vcf file.vcf.gz\n
+};
+
+if ( !defined $ARGV[0] )
+{
+    print STDERR qq|ERROR: No file <plink.hwe> given!!!\n|;
+    exit;
+}
+
+open( FILE, $ARGV[0] ) || die "ERROR: file $ARGV[0] doesn't exist!!!\n";
+
+my $out = $ARGV[0];
+$out =~ s/hwe$/avinput/;
+
+my @row = ();
+while (<FILE>)
+{
+    chomp;
+    next if (m/^\s*CHR/);
+    s/^\s+//;
+    s/\s+$//;
+    my @a = split /\s+/;
+
+    if ( $a[2] eq 'ALL' )
+    {
+        my @pos = split /_/, $a[1];
+        @row = ( $pos[0], $pos[1], $pos[1], $pos[2], $pos[3] );
+
+        # managing avinput start and stop coords
+        my $lA0 = length( $row[3] );
+        my $lA1 = length( $row[4] );
+
+        # simple case with ref length == alt lngth
+        if ( $lA0 == $lA1 )
+        {
+            $row[2] = $row[1] + 1 - $lA0;
+        }
+        else
+        {
+            # ref allele shorter than alt allele
+            if ( $lA0 < $lA1 )
+            {
+                if ( $row[4] =~ m/^$row[3]/ )
+                {
+                    $row[3] = '-';
+                    $row[4] = substr( $row[4], $lA0 );
+                    $row[1] += $lA0;
+                    $row[2] = $row[1];
+                }
+                else
+                {
+                    $row[2] = $row[1] + $lA0 - 1;
+                }
+            }
+            else
+            {
+                # ref allele longer than alt allele
+                if ( $row[3] =~ m/^$row[4]/ )
+                {
+                    $row[4] = '-';
+                    $row[3] = substr( $row[3], $lA1 );
+                    $row[1]++;
+                    $row[2] = $row[1] + length( $row[3] ) - 1;
+                }
+                else
+                {
+                    $row[2] = $row[1] + $lA0 - 1;
+                }
+            }
+        }
+    }
+
+    # importing the vcf file
+    my @geno = reverse split /\//, $a[5];
+
+    my $totRef = $geno[0] * 2 + $geno[1];
+    my $totAlt = $geno[2] * 2 + $geno[1];
+
+    my $typed   = ( $totRef + $totAlt ) / 2;
+    my $altFreq = 0;
+    $altFreq = sprintf( "%0.2f", 100 * $totAlt / ( $totRef + $totAlt ) )
+      if ( $totRef + $totAlt > 0 );
+
+    # sample typed
+    push @row, $typed;
+
+    # alt allele freq
+    push @row, $altFreq;
+
+    # push genotypes freq
+    foreach my $n (@geno)
+    {
+        if ( $typed > 0 )
+        {
+            push @row, sprintf( "%0.2f", 100 * $n / $typed );
+        }
+        else
+        {
+            push @row, 0;
+        }
+    }
+
+    print join( "\t", @row ), "\n" if ( $a[2] eq 'UNAFF' );
+}
+close FILE;
