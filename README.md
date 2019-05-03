@@ -49,6 +49,10 @@ Alleles are reported as **R** for the reference and as **A\>B** for alternative.
 The script prints a table with the number of variants (SNV and indel)
 and the ts/tv ratio. It works with multisample VCF too.
 
+### catVCF
+
+Concatenate several VCF to standard output.
+
 ### plinkHWE2avinput
 
 The script prints out an avinput table importing a plink HWE table in
