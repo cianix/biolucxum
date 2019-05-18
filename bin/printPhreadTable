@@ -25,7 +25,7 @@ my $cmd = $0;
 $cmd =~ s/^.*\///;
 print STDERR
   qq{---------------------------------------------------------------------------
-$cmd version 0.0.1 (Mar 27, 2019)
+$cmd version 0.0.2 (May 18, 2019)
 Copyright 2019 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -46,7 +46,7 @@ my $TH = 33;
 
 $TH = $ARGV[0] if ( defined $ARGV[0] && $ARGV[0] =~ m/^\d+$/ );
 
-for ( my $i = 0 ; $i < 43 ; $i++ )
+for ( my $i = 0 ; $i < 61 ; $i++ )
 {
     print join( "\t",
         $i, sprintf( "%0.6f", 10**( -$i / 10 ) ),

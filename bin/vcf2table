@@ -25,7 +25,7 @@ my $cmd = $0;
 $cmd =~ s/^.*\///;
 print STDERR
   qq{---------------------------------------------------------------------------
-$cmd version 0.0.1 (Mar 11, 2019)
+$cmd version 0.0.2 (May 3, 2019)
 Copyright 2019 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -34,6 +34,7 @@ SYNTAX:
  >  cat file.vcf | $cmd > dest.tsv
 };
 
+my $cold = '';
 while (<STDIN>)
 {
     chomp;
@@ -53,8 +54,12 @@ while (<STDIN>)
 
     my @a = split /\t/;
 
-    $a[0] =~ s/MT/M/;
-    $a[0] =~ s/^/chr/ if ( $a[0] !~ /^chr/ );
+    if ( $cold ne $a[0] )
+    {
+        print STDERR qq| DONE!\n| if ( $cold ne '' );
+        $cold = $a[0];
+        print STDERR qq|Processing $cold...|;
+    }
 
     my @row = ( $a[0], $a[1], $a[3], $a[4] );
 
