@@ -31,6 +31,14 @@ The script filter out all the VCF lines without almost a valid variant gentype
 The script selects a subset of samples from the input VCF.
 It uses a txt file to set one sample ID for line and the samples order.
 
+### gvcf2evcf
+
+The programs returns an eVCF file using a reference VCF to expand
+reference regions in gVCF file.
+
+A first release of this program is available at
+https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0132180
+
 ### vcf2table
 
 Parse the VCF file and create a table with CHR, POSITION, REFERENCE ALLELE, ALTERNATIVE ALLELE(s), GENOTYPE(s).

@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 #
 # Copyright 2018 Luciano Xumerle. All rights reserved.
@@ -25,8 +25,8 @@ my $cmd = $0;
 $cmd =~ s/^.*\///;
 print STDERR
   qq{---------------------------------------------------------------------------
-$cmd version 0.0.1 (Oct 13, 2018)
-Copyright 2018 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+$cmd version 0.0.2 (May 28, 2019)
+Copyright 2018-2019 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ---------------------------------------------------------------------------
@@ -86,6 +86,9 @@ if ( defined $ARGV[0] && -f $ARGV[0] && $ARGV[0] =~ m/\.vcf/i )
         {
             my $gt = $a[$i];
             $gt =~ s/:.*$//;
+
+            # skip BGI lines with GT=number/.
+            next if ( $gt =~ m/\./ );
 
             # correct strelka GT
             $gt = $gt . '/' . $gt if ( length($gt) == 1 );

@@ -55,6 +55,6 @@ foreach my $f (@bam)
     my $command = join ' | ',
       qq|$SAMTOOLS view $f|,
       'tail -n+100000',
-      qq|$LUMPY -r $read -X 4 -N 10000 -o /dev/null|;
+      qq|$LUMPY -r $read -X 4 -N 100000 -o /dev/null|;
     system($command);
 }
