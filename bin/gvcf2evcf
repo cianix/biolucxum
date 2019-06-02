@@ -1,0 +1,244 @@
+#!/usr/bin/perl
+
+#
+# Copyright 2015-2019 Luciano Xumerle and Alberto ferrarini. All rights reserved.
+# Luciano Xumerle <luciano.xumerle@gmail.com>
+# Alberto Ferrarini <alberto.ferrarini@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+
+my $cmd = $0;
+$cmd =~ s/^.*\///;
+print STDERR
+  qq{---------------------------------------------------------------------------
+$cmd version 0.1.0 (May 29, 2019)
+Copyright 2015-2019 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+and Alberto Ferrarini
+This is free software; see the source for copying conditions. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+---------------------------------------------------------------------------
+};
+
+#
+# TABIX PROGRAM
+#
+my $TABIX = 'tabix';
+
+#
+# list of chromosome used by tabix
+#
+my @c = (
+    "chr1",  "chr2",  "chr3",  "chr4",  "chr5",  "chr6",  "chr7",  "chr8",
+    "chr9",  "chr10", "chr11", "chr12", "chr13", "chr14", "chr15", "chr16",
+    "chr17", "chr18", "chr19", "chr20", "chr21", "chr22", "chrX",  "chrY",
+    "chrM"
+);
+
+my $ref  = '';
+my $gvcf = '';
+my $oref = 0;
+my $dest = '';
+
+for ( my $i = 0 ; $i <= $#ARGV ; $i++ )
+{
+    if ( -f $ARGV[$i] )
+    {
+        if    ( $ref eq '' )  { $ref  = $ARGV[$i]; }
+        elsif ( $gvcf eq '' ) { $gvcf = $ARGV[$i]; }
+        else
+        {
+            $ref  = '';
+            $gvcf = '';
+        }
+    }
+    elsif ( $ARGV[$i] eq '-onlyREF' )
+    {
+        $oref++;
+    }
+    elsif ( $ARGV[$i] eq '-o' && defined $ARGV[ $i + 1 ] )
+    {
+        $dest = $ARGV[ $i + 1 ];
+    }
+    elsif ( $i > 0 && $ARGV[ $i - 1 ] eq '-o' )
+    {
+        next;
+    }
+    else
+    {
+        $ref  = '';
+        $gvcf = '';
+    }
+}
+
+if ( $dest eq '' )
+{
+    $dest = $gvcf;
+    $dest =~ s/.vcf.gz$/.evcf.vcf/;
+}
+
+my $cmd = $0;
+$cmd =~ s/^.*\///;
+if ( $ref eq '' && $gvcf eq '' )
+{
+
+    print STDERR qq|SYNTAX:
+   - $cmd [-onlyREF] <ref.vcf.gz> <genome.vcf.gz> [-o dest.vcf.gz]
+
+NOTE:
+dbSNP and genome.vcf have to be compressed by bgzip and indexed by tabix.
+\n|;
+    print STDERR qq|==> File $dest already created\n\n| if ( -f $dest );
+    exit;
+}
+
+#
+# COPY HEADER TO EVCF FILE
+#
+open( FILE, "gunzip -dc $gvcf | " ) || die;
+while (<FILE>)
+{
+    if   (m/^#/) { print $_; }
+    else         { last; }
+}
+close FILE;
+
+#
+# PROCESS EACH CHROMOSOME SEPARATELY
+#
+foreach my $ch (@c)
+{
+    my %p = ();
+
+    # store min and max coordinates for the cromosome
+    my $minval = -1;
+    my $maxval = -1;
+
+    #
+    # STORE EACH KNOWN VARIANT FOR THE CURRENT CHROMOSOME INTO A HASH
+    #
+    my $countCHR = 0;
+    open( FILE, "$TABIX $ref $ch | " ) || die;
+    while (<FILE>)
+    {
+        chomp;
+        next if ( !m/^$ch\t/ );
+        my @a = split /\t/;
+
+        # SET MIN AND MAX COORDINATES
+        if ( $minval < 0 ) { $minval = $a[1]; }
+        $maxval = $a[1];
+
+        # STORE VALUES
+        my $ref    = $a[3];
+        my $alt    = $a[4];
+        my $fref   = '.';
+        my $aref   = '.';
+        my $rscode = $a[2];
+
+        if ( $a[$#a] =~ m/^.+CAF=\[(\d*\.*\d+),(\d*\.*\d+)\].+$/ )
+        {
+            $fref = $1;
+            $aref = $2;
+        }
+        $p{ $a[1] } = [ $ref, $alt, $fref, $aref, $rscode ];
+        $countCHR++;
+    }
+    close FILE;
+    print STDERR qq|Imported $countCHR variants from chrom: $ch\n|;
+    next if ( $countCHR == 0 );
+
+    # ENLARGE THE INTERVAL IF POSSIBLE
+    $minval -= 1000;
+    $minval = 0 if ( $minval < 0 );
+    $maxval += 1000;
+
+    # set the interval
+    my $lookAT = qq|$ch:$minval-$maxval|;
+    print STDERR qq|Search variants in interval $lookAT\n|;
+    my $found = 0;
+    open( FILE, "$TABIX $gvcf $lookAT | " ) || die;
+    while (<FILE>)
+    {
+        chomp;
+        my @a = split /\t/;
+
+        # SKIP VCF LINES NON-PASS OR WITHOUT A NUMERIC GT
+        next if ( $a[6] ne 'PASS' );
+
+        # get the GT fields
+        my @GT = split ':', $a[9];
+
+        next if ( $GT[0] =~ m/\./ );
+
+        if ( length( $GT[0] ) == 1 )
+        {
+            $GT[0] = $GT[0] . '/' . $GT[0];
+            $a[9] = join ':', @GT;
+        }
+
+        #
+        # if position is a variant then print
+        #
+        if ( $GT[0] =~ m/[123456789]/ )
+        {
+            # skip if not in reference VCF
+            next if ( $oref > 0 && !exists $p{ $a[1] } );
+
+            # BGI uses only ref allele for segDup: skip
+            next if ( $a[4] eq '.' );
+
+            # add rs code if defined
+            $a[2] = $p{ $a[1] }->[4] if ( exists $p{ $a[1] } );
+            print join( "\t", @a ), "\n";
+            $found++;
+        }
+        #
+        # if the position is non a variant then check for block
+        #
+        else
+        {
+            my $blockend = $a[1];
+            $blockend = $1 if ( $a[7] =~ m/^END=(\d+);/ );
+
+            for ( my $i = $a[1] ; $i <= $blockend ; $i++ )
+            {
+                if ( exists $p{$i} )
+                {
+                    my $deletionend = $i - 1 + length( $p{$i}->[0] );
+
+                    # check for deletion
+                    # the block must have the undeleted bases
+                    # if the position is no a deletion then
+                    # $deletionend = 1 -1 +1
+                    if ( $deletionend <= $blockend )
+                    {
+                        $a[1] = $i;
+                        $a[2] = $p{$i}->[4];
+                        $a[3] = substr( $p{$i}->[0], 0, 1 );
+                        $a[4] = '.';
+                        $a[7] = '.';
+                        print join( "\t", @a ), "\n";
+                        $found++;
+                    }
+                }
+            }
+        }
+    }
+    close FILE;
+    print STDERR qq|Found $found variants in interval $lookAT\n|;
+}
