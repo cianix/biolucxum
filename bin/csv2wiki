@@ -24,7 +24,7 @@ my $cmd = $0;
 $cmd =~ s/^.*\///;
 print STDERR
   qq{---------------------------------------------------------------------------
-$cmd version 0.0.2 (Apr 7, 2019)
+$cmd version 0.0.3 (Jun 2, 2019)
 Copyright 2018 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -36,6 +36,7 @@ PARAMETERS:
  -md : markdown output
  -dw : dokuwiki output
  -ht : html table output
+-tex : LaTeX table output
 
 All the output formats are printed by default.
 };
@@ -88,11 +89,13 @@ if ( $dw > 0 )
 if ( $md > 0 )
 {
     &markdown();
+    print "\n\n";
 }
 
 if ( $tex > 0 )
 {
     &tsv2latex();
+    print "\n\n";
 }
 
 sub loadTSV
