@@ -61,6 +61,13 @@ and the ts/tv ratio. It works with multisample VCF too.
 
 Concatenate several VCF to standard output.
 
+### fullBundle2subset
+
+To build a GATK reference genome with less chromosomes, all the unuseful chromosomes must be removed
+from the fasta file and from all the VCF.gz files in the bundle.
+*fullBundle2subset* takes in input the samtools faidx file of the new reference and and a vcf.gz and
+print out a new VCF file without the unwanted contigs.
+
 ### plinkHWE2avinput
 
 The script prints out an avinput table importing a plink HWE table in

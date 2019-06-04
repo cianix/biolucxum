@@ -1,0 +1,80 @@
+#!/usr/bin/perl
+
+#
+# Copyright 2019 Luciano Xumerle. All rights reserved.
+# Luciano Xumerle <luciano.xumerle@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+
+my $cmd = $0;
+$cmd =~ s/^.*\///;
+print STDERR
+  qq{---------------------------------------------------------------------------
+$cmd version 0.0.1 (Jun 4, 2019)
+Copyright 2019 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+This is free software; see the source for copying conditions. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+---------------------------------------------------------------------------
+SYNTAX:
+ > $cmd <destGenome.fasta.fai> </path/to/bundleFile.vcf.gz> | bgzip > newBundleFile.vcf.gz
+ > tabix newBundleFile.vcf.gz
+
+The program removes from destination VCF all the contig not saved in <destGenome.fasta.fai>
+
+};
+
+my %chrom = ();
+
+if ( defined $ARGV[1] && -f $ARGV[0] && -f $ARGV[1] )
+{
+    open( FILE, $ARGV[0] ) || die;
+    while (<FILE>)
+    {
+        chomp;
+        s/\t.*$//;
+        $chrom{$_} = 1;
+    }
+    close FILE;
+
+    open( FILE, "gunzip -dc $ARGV[1] | " ) || die;
+    while (<FILE>)
+    {
+        chomp;
+        if (m/^#/)
+        {
+            if (m/##contig=<ID=(.+),length/)
+            {
+                print $_, "\n" if ( defined $chrom{$1} );
+            }
+            else
+            {
+                print $_, "\n";
+            }
+        }
+        else
+        {
+            my @a = split /\t/;
+            print $_, "\n" if ( defined $chrom{ $a[0] } );
+        }
+    }
+    close FILE;
+}
+else
+{
+    print STDERR qq|Nothing to do!\n\n|;
+}
