@@ -13,23 +13,28 @@ make install
 
 ## Programs description
 
+
 ### extract\_variants
 
 I rewrite a perl version of this program from the [gvcftools](https://github.com/sequencing/gvcftools)
 
+
 ### get\_called\_regions
 
 I rewrite a perl version of this program from the [gvcftools](https://github.com/sequencing/gvcftools)
+
 
 ### getVariantsSelected
 
 The script filter out all the VCF lines without almost a valid variant gentype
 (PASS and with a number grater than 0 in a GT field).
 
+
 ### sampleSelected
 
 The script selects a subset of samples from the input VCF.
 It uses a txt file to set one sample ID for line and the samples order.
+
 
 ### gvcf2evcf
 
@@ -39,27 +44,33 @@ reference regions in gVCF file.
 A first release of this program is available at
 https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0132180
 
+
 ### vcf2table
 
 Parse the VCF file and create a table with CHR, POSITION, REFERENCE ALLELE, ALTERNATIVE ALLELE(s), GENOTYPE(s).
 
+
 ### vcf2bed
 
 Sometimes I need to convert a VCF file to a BED format.
+
 
 ### vcf2AlleleBED
 
 To convert a VCF file to a bed file with column: chr, start, stop, allele1, allele2.
 Alleles are reported as **R** for the reference and as **A\>B** for alternative.
 
+
 ### vcf-tstv-stats
 
 The script prints a table with the number of variants (SNV and indel)
 and the ts/tv ratio. It works with multisample VCF too.
 
+
 ### catVCF
 
 Concatenate several VCF to standard output.
+
 
 ### fullBundle2subset
 
@@ -67,6 +78,7 @@ To build a GATK reference genome with less chromosomes, all the unuseful chromos
 from the fasta file and from all the VCF.gz files in the bundle.
 *fullBundle2subset* takes in input the samtools faidx file of the new reference and and a vcf.gz and
 print out a new VCF file without the unwanted contigs.
+
 
 ### plinkHWE2avinput
 
@@ -89,6 +101,14 @@ Example:
    1   chr1_10145_AAC_A      AFF    A  AAC       0/1/0        1      0.5       1
    1   chr1_10145_AAC_A    UNAFF    A  AAC       0/0/7        0        0       1
 ~~~~
+
+
+### addUMI
+
+The script reads *bwa* output from STDIN and add the RX tag to each reads.
+It requires the gzipped fastq files for read1, read2 and UMI sequences and
+the same reads order in all the fastq files.
+
 
 ### insertSize
 
