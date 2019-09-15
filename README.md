@@ -63,7 +63,7 @@ Alleles are reported as **R** for the reference and as **A\>B** for alternative.
 
 ### vcf-tstv-stats
 
-The script prints a table with the number of variants (SNV and indel)
+The script prints a table with the number of variants (SNV and indel), the heterozygosity ratio
 and the ts/tv ratio. It works with multisample VCF too.
 
 

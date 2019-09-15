@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 #
-# Copyright 2018 Luciano Xumerle. All rights reserved.
+# Copyright 2018-2019 Luciano Xumerle. All rights reserved.
 # Luciano Xumerle <luciano.xumerle@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -25,7 +25,7 @@ my $cmd = $0;
 $cmd =~ s/^.*\///;
 print STDERR
   qq{---------------------------------------------------------------------------
-$cmd version 0.0.2 (May 28, 2019)
+$cmd version 0.0.3 (Sep 15, 2019)
 Copyright 2018-2019 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -93,12 +93,14 @@ if ( defined $ARGV[0] && -f $ARGV[0] && $ARGV[0] =~ m/\.vcf/i )
             # correct strelka GT
             $gt = $gt . '/' . $gt if ( length($gt) == 1 );
 
-            # next is gt is not valid (./.) or is omoref (0/0)
-            if ( $gt =~ m/[123456789]/ )
+            # next is gt is is not a variant
+            if ( $gt =~ m/[123456789]+/ )
             {
                 my @gg = sort { $a <=> $b } split /[\/\|]/, $gt;
                 my $geno = $alleles[0] . $alleles[ $gg[1] ];
                 $$stats{ $header[$i] }->{'tot'}++;
+                if   ( $gg[0] == $gg[1] ) { $$stats{ $header[$i] }->{'omo'}++; }
+                else                      { $$stats{ $header[$i] }->{'het'}++; }
 
                 next if ( length($geno) > 2 );
 
@@ -110,6 +112,12 @@ if ( defined $ARGV[0] && -f $ARGV[0] && $ARGV[0] =~ m/\.vcf/i )
     close FILE;
 
     open( OUT, ">$dest" ) || die;
+
+    print OUT join( "\t",
+        "Sample",        'variants', 'omoVar', 'het',
+        'het.omo.ratio', 'snv',      'indel',  'ts.tv.ratio' ),
+      "\n";
+
     for ( my $i = 9 ; $i <= $#header ; $i++ )
     {
         my $ts = 0;
@@ -127,8 +135,12 @@ if ( defined $ARGV[0] && -f $ARGV[0] && $ARGV[0] =~ m/\.vcf/i )
         }
         my $ratio = $tv ? $ts / $tv : 0;
 
-        my $n = $$stats{ $header[$i] }->{'tot'};
-        printf OUT $header[$i] . qq|\t%d\t%d\t%d\t%.2f\n|, $n, $ts + $tv,
+        my $n        = $$stats{ $header[$i] }->{'tot'};
+        my $omo      = $$stats{ $header[$i] }->{'omo'};
+        my $het      = $$stats{ $header[$i] }->{'het'};
+        my $hetVSomo = $het / $omo;
+        printf OUT $header[$i] . qq|\t%d\t%d\t%d\t%.2f\t%d\t%d\t%.2f\n|, $n,
+          $omo, $het, $hetVSomo, $ts + $tv,
           $n - $ts - $tv, $ratio;
     }
     close OUT;

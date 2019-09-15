@@ -28,8 +28,8 @@ my $cmd = $0;
 $cmd =~ s/^.*\///;
 print STDERR
   qq{---------------------------------------------------------------------------
-$cmd version 0.0.1 (Oct 13, 2018)
-Copyright 2018 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+$cmd version 0.0.2 (Aug 20, 2019)
+Copyright 2018-19 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ---------------------------------------------------------------------------
@@ -56,14 +56,24 @@ foreach my $f (@ARGV)
 if ( $bam ne '' )
 {
     open( FILE, qq{samtools idxstats "$bam" | } ) || die;
+    my @sex = ( 0, 0 );
     while (<FILE>)
     {
         chomp;
-        if (m/[XY]/)
+        if ( ( m/^chr[XY]/ || m/^[XY]/ ) && !m/[XY]_/ )
         {
             my @a = split /\s+/;
+            if ( $a[0] =~ m/X/ )
+            {
+                $sex[0] = $a[2] * $read_length / $a[1];
+            }
+            else
+            {
+                $sex[1] = $a[2] * $read_length / $a[1];
+            }
             print join( "\t", @a, $a[2] * $read_length / $a[1] ), "\n";
         }
     }
     close FILE;
+    print qq|RATIO: |, $sex[0] / $sex[1], "\n";
 }
