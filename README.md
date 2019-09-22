@@ -67,6 +67,11 @@ The script prints a table with the number of variants (SNV and indel), the heter
 and the ts/tv ratio. It works with multisample VCF too.
 
 
+### typedSampleVCF
+
+For each variant, the script prints out the number and the percentage of typed samples.
+
+
 ### catVCF
 
 Concatenate several VCF to standard output.
