@@ -77,6 +77,11 @@ For each variant, the script prints out the number and the percentage of typed s
 Concatenate several VCF to standard output.
 
 
+### compareVCF
+
+A simple script to compare the gentypes from a pair of VCF files.
+
+
 ### fullBundle2subset
 
 To build a GATK reference genome with less chromosomes, all the unuseful chromosomes must be removed

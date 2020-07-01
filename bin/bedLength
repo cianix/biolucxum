@@ -81,6 +81,7 @@ sub getLength
         chomp;
         s/\s*$//;
         my @a = split /\t/;
+        next if ( !defined $a[2] || $a[1] !~ m/^\d+$/ || $a[2] !~ m/^\d+$/ );
         $noMerge += ( $a[2] - $a[1] );
         push @{ $h{ $a[0] } }, [ $a[1], $a[2] ];
     }

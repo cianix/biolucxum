@@ -1,0 +1,139 @@
+#!/usr/bin/perl
+#
+# Copyright 2020 Luciano Xumerle. All rights reserved.
+# Luciano Xumerle <luciano.xumerle@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+
+# hash is:
+# $vcf{chr}->{pos}->{file} = geno
+
+my $cmd = $0;
+$cmd =~ s/^.*\///;
+print STDERR
+  qq{---------------------------------------------------------------------------
+$cmd version 0.0.1 (Jul 1, 2020)
+Copyright 2020 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+This is free software; see the source for copying conditions. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+---------------------------------------------------------------------------
+SYNTAX:
+
+ > $cmd <ref.vcf[.gz]> <toBeTested.vcf[.gz]>
+
+};
+
+exit if ( !defined $ARGV[1] );
+
+my %vcf = ();
+my %ref = ();
+my @row = ();
+foreach my $f (@ARGV)
+{
+    if ( $f =~ m/vcf.gz$/i ) { open( FILE, "gzip -dc $f | " ) || die; }
+    elsif ( $f =~ m/vcf$/i ) { open( FILE, $f ) || die; }
+
+    push @row, $f;
+
+    while (<FILE>)
+    {
+        chomp;
+        next if ( m/^#/ || !m/\tPASS\t/ );
+
+        my @a = split /\t/;
+        $ref{ $a[0] }->{ $a[1] } = $a[3];
+        $vcf{ $a[0] }->{ $a[1] }->{$f} = join '/',
+          @{ &vcfAllele( $a[3], $a[4], $a[9] ) };
+    }
+    close FILE;
+}
+
+for ( my $i = 0 ; $i < $#ARGV ; $i++ )
+{
+    for ( my $j = $i + 1 ; $j <= $#ARGV ; $j++ )
+    {
+        push @row, $i . '-' . $j;
+    }
+}
+print join( "\t", 'chr', 'pos', @row ), "\n";
+
+foreach my $chr ( sort keys %vcf )
+{
+    foreach my $pos ( sort { $a <=> $b } keys %{ $vcf{$chr} } )
+    {
+        my @row = ();
+        foreach my $f (@ARGV)
+        {
+            $vcf{$chr}->{$pos}->{$f} = './.'
+              if ( !defined $vcf{$chr}->{$pos}->{$f} );
+            push @row, $vcf{$chr}->{$pos}->{$f};
+        }
+        my $len = $#row;
+        for ( my $i = 0 ; $i < $len ; $i++ )
+        {
+            for ( my $j = $i + 1 ; $j < $len + 1 ; $j++ )
+            {
+                my $t = 'OK';
+                $t = 'NO' if ( $row[$i] ne $row[$j] );
+                push @row, $t;
+            }
+        }
+        print join( "\t", $chr, $pos, $ref{$chr}->{$pos}, @row ), "\n";
+    }
+}
+
+#
+# set the allele positions for vcf column 10
+#
+sub allelePosition
+{
+    my $geno = shift;
+    if ( $geno =~ m|^(\d+)[\|\/](\d+)| )
+    {
+        return [ $1, $2 ];
+    }
+    elsif ( $geno =~ m/^(\d+)/ )
+    {
+        return [ $1, $1 ];
+    }
+    return [ -1, -1 ];
+}
+
+#
+# get the GT value
+# input:
+# -> vcf reference
+# -> the vcf alternative allele(s)
+# -> the GT:.... string
+#
+sub vcfAllele
+{
+    my $ref    = shift;
+    my $alleli = shift;
+    my $geno   = shift;
+
+    my @listaAlleli = split ',', $ref . ',' . $alleli;
+
+    $geno = &allelePosition($geno);
+
+    if ( $geno->[0] > -1 )
+    {
+        return [ $listaAlleli[ $geno->[0] ], $listaAlleli[ $geno->[1] ] ];
+    }
+    return [ '.', '.' ];
+}
