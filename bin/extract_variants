@@ -45,6 +45,7 @@ while (<STDIN>)
     }
     else
     {
+        next if ( !m/\tPASS\t/  );
         my @a = split "\t";
 
         # NO ALTERNATIVE ALLELES
