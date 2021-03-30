@@ -90,9 +90,9 @@ from the fasta file and from all the VCF.gz files in the bundle.
 print out a new VCF file without the unwanted contigs.
 
 
-### createGenomeSizeXML
+### prepareGenomeSizeXML
 
-Used to create the "GenomeSize.xml" file needed by Illumina genomes.
+Used to prepare the "GenomeSize.xml" file needed by Illumina genomes.
 
 
 ### plinkHWE2avinput

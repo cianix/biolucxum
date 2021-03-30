@@ -1,0 +1,137 @@
+#!/usr/bin/perl
+
+#
+# Copyright 2020 Luciano Xumerle. All rights reserved.
+# Luciano Xumerle <luciano.xumerle@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+
+my $cmd = $0;
+$cmd =~ s/^.*\///;
+print STDERR
+  qq{---------------------------------------------------------------------------
+$cmd version 0.0.1 (Oct 21, 2020)
+Copyright 2020 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+This is free software; see the source for copying conditions. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+---------------------------------------------------------------------------
+
+SYNTAX:
+
+ > $cmd <genome.fa> <genome.dict> <genomeName>
+
+
+Note:
+- Use the picard CreateSequenceDictionary to create the genome.dict file
+- genomeName example: "Homo sapiens (NCBI build37.2)"
+
+};
+
+if ( defined $ARGV[2] && -f $ARGV[1] && -f $ARGV[0] )
+{
+
+    &createGenomeSizeXML( $ARGV[0], $ARGV[1], $ARGV[2] );
+}
+else
+{
+    print STDERR qq|Invalid parameters: nothing to do\n\n|;
+}
+
+sub createGenomeSizeXML
+{
+    my $fasta = shift;
+    my $dict  = shift;
+    my $name  = shift;
+
+    my %chr = ();
+
+    my $ch = '';
+    open( FILE, $dict ) || die;
+    while (<FILE>)
+    {
+        chomp;
+        if (m/\@SQ/)
+        {
+            my @a = split /[\s+:]/;
+            for ( my $i = 0 ; $i <= $#a ; $i++ )
+            {
+                $ch                       = $a[ $i + 1 ] if ( $a[$i] eq 'SN' );
+                $chr{$ch}->{'totalBases'} = $a[ $i + 1 ] if ( $a[$i] eq 'LN' );
+                $chr{$ch}->{'md5'}        = $a[ $i + 1 ] if ( $a[$i] eq 'M5' );
+            }
+        }
+    }
+    close FILE;
+
+    open( FILE, $fasta ) || die;
+    my @order = ();
+    $ch = '';
+    my $contaN = 0;
+
+    open( OUT, '>GenomeSize.xml' ) || die;
+
+    print OUT qq|<sequenceSizes genomeName="$name">\n|;
+
+    while (<FILE>)
+    {
+        chomp;
+        if (m/^>(.+)/)
+        {
+            if ( $ch ne '' )
+            {
+                $chr{$ch}->{'knownBases'} = $chr{$ch}->{'totalBases'} - $contaN;
+                print OUT &printLine(
+                    $fasta, $ch,
+                    $chr{$ch}->{'totalBases'},
+                    $chr{$ch}->{'knownBases'},
+                    $chr{$ch}->{'md5'}
+                );
+            }
+            $ch     = $1;
+            $contaN = 0;
+            push @order, $ch;
+        }
+        else
+        {
+            my $count = () = $_ =~ /N/ig;
+            $contaN += $count;
+        }
+    }
+    close FILE;
+    $chr{$ch}->{'knownBases'} = $chr{$ch}->{'totalBases'} - $contaN;
+    print OUT &printLine(
+        $fasta, $ch,
+        $chr{$ch}->{'totalBases'},
+        $chr{$ch}->{'knownBases'},
+        $chr{$ch}->{'md5'}
+    );
+
+    print OUT qq|</sequenceSizes>\n|;
+    close OUT;
+}
+
+sub printLine
+{
+    my $fasta      = shift;
+    my $ch         = shift;
+    my $totalBases = shift;
+    my $knownBases = shift;
+    my $md5        = shift;
+    return '        '
+      . qq|<chromosome fileName="$fasta" contigName="$ch" totalBases="$totalBases" isCircular="false" md5="$md5" ploidy="2" knownBases="$knownBases" />\n|;
+}
