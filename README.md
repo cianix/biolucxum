@@ -95,6 +95,26 @@ print out a new VCF file without the unwanted contigs.
 Used to prepare the "GenomeSize.xml" file needed by Illumina genomes.
 
 
+### splitIlluminaLane
+
+The program parses a fastq[.gz] file and produces a new fastq file for each detected sequencer / flowcell / lane.
+
+The new fastq files will be named as in the following example:
+
+~~~~~
+INPUT:
+
+31711_II_1.fastq.gz
+
+OUTPUT:
+
+31711_II_1-ST-E00104-1314-HGFVCCCX2-5.fastq
+31711_II_1-ST-E00104-1314-HGFVCCCX2-6.fastq
+31711_II_1-ST-E00104-1314-HGFVCCCX2-7.fastq
+31711_II_1-ST-E00104-1314-HGFVCCCX2-8.fastq
+~~~~~
+
+
 ### plinkHWE2avinput
 
 The script prints out an avinput table importing a plink HWE table in
