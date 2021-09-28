@@ -182,11 +182,6 @@ with the default *ASCII_BASE = 33*
 NOTE: Old Illumina fastq uses *ASCII_BASE = 64*
 
 
-### realPath
-
-A perl replacement for the realpath(3) command.
-
-
 ### csv2wiki
 
 The script loads a TSV file and prints out the dokuwiki table
@@ -205,6 +200,17 @@ or a TSV file the XLSX format using file extension.
 
 **NOTE**: This is a wrapper to the *ssconvert* program
       released with *gnumeric*.
+
+
+### pathDim
+
+The script calculates the space occupied by a list of files and/or directories.
+It uses the command **ls** for files and **du** for dirs
+
+
+### realPath
+
+A perl replacement for the realpath(3) command.
 
 
 ## License
