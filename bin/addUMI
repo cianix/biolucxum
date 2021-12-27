@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 #
-# Copyright 2019 Luciano Xumerle. All rights reserved.
+# Copyright 2019-2021 Luciano Xumerle. All rights reserved.
 # Luciano Xumerle <luciano.xumerle@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -20,48 +20,310 @@
 
 use strict;
 use warnings;
+use Cwd 'abs_path';
+use Sys::Hostname;
 
-my $cmd = $0;
+my $addUMI = abs_path($0);
+my @a      = split '/', $addUMI;
+my $cmd    = pop @a;
+
+my $BWA      = 'bwa';
+my $SAMTOOLS = 'samtools';
+
 $cmd =~ s/^.*\///;
-print STDERR
+
+my $HELP =
   qq{---------------------------------------------------------------------------
-$cmd version 0.0.1 (Jul 28, 2019)
-Copyright 2018 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+$cmd version 0.1.0 (Dec 27, 2021)
+Copyright 2019-2021 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ---------------------------------------------------------------------------
 SYNTAX:
 
- >  bwa mem <ref.fasta> <read1.fastq.gz> <read2.fastq.gz> | $cmd <readUMI.fastq.gz> > map.sam
+ > bwa mem <ref.fasta> <read1.fastq.gz> <read2.fastq.gz> | $cmd <readUMI.fastq.gz> > map.sam
+
+ > $cmd map <ref.fasta> <file1.fastq[.gz]> [file2.fastq[.gz]] <#CPU>
+ > $cmd map <ref.fasta> <file1.fastq[.gz]> [file2.fastq[.gz]] [umi.fastq[.gz]] <#CPU>
+
+NOTE: UMI fastq file is accepted as third fastq input
+
+PARS to use a specific bwa/samtools version:
+
+  -bwa <path to bwa>
+  -samtools <path to samtools>
+
+To trim reads length:
+
+ > $cmd trimReads <file.fastq> <length>
 
 };
 
-exit if ( !defined $ARGV[0] || !-f $ARGV[0] );
+my $mapBWA = 0;
+my $trim   = 0;
 
-my $id   = '';
-my $umi  = '';
-my $none = '';
-open( FILE, "gzip -dc $ARGV[0] | " ) || die;
+my $FASTA   = '';
+my $f1      = '';
+my $f2      = '';
+my $umi     = '';
+my $cpu     = 0;
+my $outFile = '';
 
-while (<STDIN>)
+my $old = '';
+foreach my $file (@ARGV)
 {
-    chomp;
-
-    if (m/^\@/) { print "$_\n"; next; }
-
-    my @a = split /\t/;
-    while ( $a[0] ne $id )
+    if ( $file eq 'map' )
     {
-        $id = <FILE>;
-        chomp $id;
-        $id =~ s/\s+.*$//;
-        $id =~ s/^.//;
-        $umi = <FILE>;
-        chomp $umi;
-        $none = <FILE>;
-        $none = <FILE>;
+        $mapBWA++;
+    }
+    elsif ( $file eq 'trimReads' )
+    {
+        $trim++;
+    }
+    elsif ( -f $file )
+    {
+        if ( $file =~ m/\.fastq/ || $file =~ m/\.fq/ )
+        {
+            if ( $f1 eq '' )
+            {
+                $f1 = abs_path($file);
+            }
+            elsif ( $f2 eq '' )
+            {
+                $f2 = abs_path($file);
+            }
+            elsif ( $umi eq '' )
+            {
+                $umi = abs_path($file);
+            }
+            else
+            {
+                print STDERR
+                  qq|ERROR: More than 2+UMI fastq files in input!!!\n\n|;
+                exit;
+            }
+        }
+        elsif ( $file =~ m/\.fa/ )
+        {
+            $FASTA = abs_path($file);
+        }
+        elsif ( $old eq '-bwa' )
+        {
+            $BWA = abs_path($file);
+        }
+        elsif ( $old eq '-samtools' )
+        {
+            $SAMTOOLS = abs_path($file);
+        }
+    }
+    elsif ( $file =~ m/.bam$/ && !-f $file )
+    {
+        $outFile = $file;
+    }
+    elsif ( $file =~ m/^\d+$/ )
+    {
+        $cpu = $file;
+    }
+    $old = $file;
+}
+
+if ( $mapBWA == 0 && $trim == 0 && -f $f1 && $f2 eq '' )
+{
+    &addUMI($f1);
+}
+elsif ( $trim > 0 && $mapBWA == 0 && -f $f1 && $f2 eq '' && $cpu > 0 )
+{
+    &trimReads( $f1, $cpu );
+}
+elsif ( $mapBWA > 0 && $trim == 0 && $f1 ne '' && $FASTA ne '' )
+{
+
+    #
+    # manage thread
+    #
+    if ( $cpu < 1 )
+    {
+        open( PROC, '/proc/cpuinfo' )
+          || die "Can't open /proc/cpuinfo file\n\n";
+        while (<PROC>) { $cpu++ if (m/processor\s*:\s*\d/); }
+        close PROC;
     }
 
-    print join "\t", @a, qq|RX:Z:$umi\n|;
+    #
+    # manage out file
+    #
+    $outFile = 'start_sorted.bam' if ( $outFile eq '' );
+    if ( -f $outFile )
+    {
+        print "\nstart_sorted.bam was already created!\n\n";
+        exit;
+    }
+
+    my $hostname = hostname;
+
+    my @tt   = split /\//, $f1;
+    my $NAME = $tt[-2];
+    my $ID   = time;
+
+    print STDERR "BWA started on $hostname at " . scalar( localtime() ) . "\n";
+    print STDERR qq|
+FASTQ1: $f1
+FASTQ2: $f2
+   UMI: $umi
+   REF: $FASTA
+  NAME: $NAME
+    ID: $ID
+   CPU: $cpu in $hostname
+|;
+
+    &bwa(
+        $BWA,   $SAMTOOLS, $addUMI, $cpu, $ID, $NAME,
+        $FASTA, $outFile,  $f1,     $f2,  $umi
+    );
+
+    &flagstat( $SAMTOOLS, $cpu, $outFile );
+
+    print "BWA finished on $hostname at " . scalar( localtime() ) . "\n";
 }
-close FILE;
+else
+{
+    print STDERR $HELP;
+}
+
+#
+# ADD UMI TO BWA SAM OUTPUT
+#
+sub addUMI
+{
+    my $umiFile = shift;
+    my $id      = '';
+    my $umi     = '';
+    my $none    = '';
+
+    if ( $umiFile =~ m/gz/ )
+    {
+        open( FILE, "gzip -dc $ARGV[0] | " ) || die;
+    }
+    else
+    {
+        open( FILE, $umiFile ) || die;
+    }
+
+    while (<STDIN>)
+    {
+        chomp;
+
+        if (m/^\@/) { print "$_\n"; next; }
+
+        my @a = split /\t/;
+        while ( $a[0] ne $id )
+        {
+            $id = <FILE>;
+            chomp $id;
+            $id =~ s/\s+.*$//;
+            $id =~ s/^.//;
+            $umi = <FILE>;
+            chomp $umi;
+            $none = <FILE>;
+            $none = <FILE>;
+        }
+
+        print join "\t", @a, qq|RX:Z:$umi\n|;
+    }
+    close FILE;
+}
+
+#
+# MAKE FLAGSTAT WITH SAMTOOLS
+#
+sub flagstat
+{
+    my $samtools = shift;
+    my $ths      = shift;
+    my $bam      = shift;
+
+    print STDERR "Making flagstat...";
+    open( FLAGSTAT, "$samtools flagstat -@ $ths $bam | " ) || die;
+    my $flags = $bam;
+    $flags =~ s/.bam$/.flagstat/i;
+    open( FLAGOUT, ">$flags" ) || die;
+    while (<FLAGSTAT>) { print FLAGOUT $_; }
+    close FLAGOUT;
+    close FLAGSTAT;
+    print STDERR "DONE.\n";
+}
+
+#
+# MAKE BAM FILE WITH BWA
+#
+sub bwa
+{
+    my $BWA      = shift;
+    my $SAMTOOLS = shift;
+    my $addUMI   = shift;
+    my $cpu      = shift;
+    my $ID       = shift;
+    my $NAME     = shift;
+    my $FASTA    = shift;
+    my $dest     = shift;
+    my $f1       = shift;
+    my $f2       = shift;
+    my $umi      = shift;
+
+    my $RG = join "\\t", '"@RG', "ID:$ID", 'PU:lane', "LB:$NAME", "SM:$NAME",
+      'CN:PersonalGenomics', 'PL:ILLUMINA"';
+
+    my $scpu = 1;
+    $scpu = int( $cpu / 5 ) if ( $cpu > 9 );
+    my $bcpu = $cpu - $scpu;
+
+    if ( $umi eq '' )
+    {
+`$BWA mem -R $RG -t $bcpu $FASTA $f1 $f2 | $SAMTOOLS sort --threads $scpu - -o $dest`;
+    }
+    else
+    {
+        $bcpu--;
+`$BWA mem -R $RG -t $bcpu $FASTA $f1 $f2 | $addUMI $umi | $SAMTOOLS sort --threads $scpu - -o $dest`;
+    }
+
+    # index with sambamba
+    print STDERR "Indexing...\n";
+    system( $SAMTOOLS, 'index', '-@' . $cpu, $dest );
+}
+
+#
+# TRIM READS LENGTH IN FASTQ
+#
+sub trimReads
+{
+    my $fastq = shift;
+    my $len   = shift;
+
+    if ( $fastq =~ m/gz$/i )
+    {
+        open( FIN, "gzip -dc \"$fastq\" | " ) || die;
+    }
+    else
+    {
+        open( FIN, $fastq ) || die;
+    }
+    my $dest = $fastq;
+    $dest =~ s/.fastq/-trim$len.fastq/;
+    $dest =~ s/.fq/-trim$len.fq/;
+    open( FOUT, " | gzip > \"$dest\"" ) || die;
+
+    while (<FIN>)
+    {
+        my $seq = <FIN>;
+        my $q   = <FIN>;
+        $q = <FIN>;
+
+        chomp $seq;
+        chomp $q;
+        print FOUT $_, substr( $seq, 0, $len ), "\n+\n", substr( $q, 0, $len ),
+          "\n";
+    }
+    close FOUT;
+    close FIN;
+}

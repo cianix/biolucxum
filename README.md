@@ -141,8 +141,11 @@ Example:
 ### addUMI
 
 The script reads *bwa* output from STDIN and add the RX tag to each reads.
-It requires the gzipped fastq files for read1, read2 and UMI sequences and
-the same reads order in all the fastq files.
+The script takes the UMI sequences from a fastq.gz file. The Fastq files used as input
+in BWA must have the same order than the UMI fastq file.
+
+The script can also be used as a wrapper to the BWA command and to trim the reads to
+a given length.
 
 
 ### insertSize
