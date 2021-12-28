@@ -29,38 +29,46 @@ my $cmd    = pop @a;
 
 my $BWA      = 'bwa';
 my $SAMTOOLS = 'samtools';
+my $FASTQC   = 'fastqc';
+my $FASTP    = 'fastp';
 
 $cmd =~ s/^.*\///;
 
 my $HELP =
   qq{---------------------------------------------------------------------------
-$cmd version 0.1.0 (Dec 27, 2021)
+$cmd version 0.2.0 (Dec 28, 2021)
 Copyright 2019-2021 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ---------------------------------------------------------------------------
 SYNTAX:
 
- > bwa mem <ref.fasta> <read1.fastq.gz> <read2.fastq.gz> | $cmd <readUMI.fastq.gz> > map.sam
+FastQC wrapper
+--------------
+ > $cmd fastqc [-fastqc <path>] [-noTrim] <file1.fastq.gz> [file2.fastq.gz]
+ > $cmd fastqc [-fastqc <path>] [-noTrim] <fastqDir>
 
- > $cmd map <ref.fasta> <file1.fastq[.gz]> [file2.fastq[.gz]] <#CPU>
+fastp wrapper
+-------------
+ > $cmd fastp [-fastp <path>] <file1.fastq.gz> [file2.fastq.gz]
+
+BWA-mem wrapper
+---------------
+ > $cmd map [-bwa <path>] [-samtools <path>] <ref.fasta> <file1.fastq[.gz]> [file2.fastq[.gz]] <#CPU>
  > $cmd map <ref.fasta> <file1.fastq[.gz]> [file2.fastq[.gz]] [umi.fastq[.gz]] <#CPU>
+
+ > bwa mem <ref.fasta> <read1.fastq.gz> <read2.fastq.gz> | $cmd <readUMI.fastq.gz> > map.sam
 
 NOTE: UMI fastq file is accepted as third fastq input
 
-PARS to use a specific bwa/samtools version:
-
-  -bwa <path to bwa>
-  -samtools <path to samtools>
-
-To trim reads length:
-
- > $cmd trimReads <file.fastq> <length>
-
-};
+To trim reads length in fastq file
+----------------------------------
+ > $cmd trimReads <file.fastq> <length>\n\n};
 
 my $mapBWA = 0;
 my $trim   = 0;
+my $fastqc = 0;
+my $fastp  = 0;
 
 my $FASTA   = '';
 my $f1      = '';
@@ -68,6 +76,8 @@ my $f2      = '';
 my $umi     = '';
 my $cpu     = 0;
 my $outFile = '';
+my $noTrim  = 0;
+my $dir     = '';
 
 my $old = '';
 foreach my $file (@ARGV)
@@ -79,6 +89,18 @@ foreach my $file (@ARGV)
     elsif ( $file eq 'trimReads' )
     {
         $trim++;
+    }
+    elsif ( $file eq 'fastqc' )
+    {
+        $fastqc++;
+    }
+    elsif ( $file eq 'fastp' )
+    {
+        $fastp++;
+    }
+    elsif ( -d $file )
+    {
+        $dir = abs_path($file);
     }
     elsif ( -f $file )
     {
@@ -98,8 +120,7 @@ foreach my $file (@ARGV)
             }
             else
             {
-                print STDERR
-                  qq|ERROR: More than 2+UMI fastq files in input!!!\n\n|;
+                &log("ERROR: More than 2+UMI fastq files in input!!!\n");
                 exit;
             }
         }
@@ -115,6 +136,14 @@ foreach my $file (@ARGV)
         {
             $SAMTOOLS = abs_path($file);
         }
+        elsif ( $old eq '-fastqc' )
+        {
+            $FASTQC = abs_path($file);
+        }
+        elsif ( $old eq '-fastp' )
+        {
+            $FASTP = abs_path($file);
+        }
     }
     elsif ( $file =~ m/.bam$/ && !-f $file )
     {
@@ -124,20 +153,15 @@ foreach my $file (@ARGV)
     {
         $cpu = $file;
     }
+    elsif ( $file eq '-noTrim' )
+    {
+        $noTrim++;
+    }
     $old = $file;
 }
 
-if ( $mapBWA == 0 && $trim == 0 && -f $f1 && $f2 eq '' )
+if ( $mapBWA > 0 && $f1 ne '' && $FASTA ne '' )
 {
-    &addUMI($f1);
-}
-elsif ( $trim > 0 && $mapBWA == 0 && -f $f1 && $f2 eq '' && $cpu > 0 )
-{
-    &trimReads( $f1, $cpu );
-}
-elsif ( $mapBWA > 0 && $trim == 0 && $f1 ne '' && $FASTA ne '' )
-{
-
     #
     # manage thread
     #
@@ -155,7 +179,7 @@ elsif ( $mapBWA > 0 && $trim == 0 && $f1 ne '' && $FASTA ne '' )
     $outFile = 'start_sorted.bam' if ( $outFile eq '' );
     if ( -f $outFile )
     {
-        print "\nstart_sorted.bam was already created!\n\n";
+        &log( $HELP . "$outFile was already created!\n" );
         exit;
     }
 
@@ -165,16 +189,17 @@ elsif ( $mapBWA > 0 && $trim == 0 && $f1 ne '' && $FASTA ne '' )
     my $NAME = $tt[-2];
     my $ID   = time;
 
-    print STDERR "BWA started on $hostname at " . scalar( localtime() ) . "\n";
-    print STDERR qq|
+    &log( "BWA started on $hostname at " . scalar( localtime() ) );
+    &log(
+        qq|
 FASTQ1: $f1
 FASTQ2: $f2
    UMI: $umi
    REF: $FASTA
   NAME: $NAME
     ID: $ID
-   CPU: $cpu in $hostname
-|;
+   CPU: $cpu in $hostname|
+    );
 
     &bwa(
         $BWA,   $SAMTOOLS, $addUMI, $cpu, $ID, $NAME,
@@ -183,11 +208,27 @@ FASTQ2: $f2
 
     &flagstat( $SAMTOOLS, $cpu, $outFile );
 
-    print "BWA finished on $hostname at " . scalar( localtime() ) . "\n";
+    &log( "BWA finished on $hostname at " . scalar( localtime() ) );
+}
+elsif ( $trim > 0 && -f $f1 && $f2 eq '' && $cpu > 0 )
+{
+    &trimReads( $f1, $cpu );
+}
+elsif ( $fastqc > 0 && ( $f1 ne '' || $dir ne '' ) )
+{
+    &fastqc( $f1, $f2, $dir, $noTrim, $FASTQC );
+}
+elsif ( $fastp > 0 && $f1 ne '' )
+{
+    &fastp( $f1, $f2, $FASTP );
+}
+elsif ( $f1 ne '' )
+{
+    &addUMI($f1);
 }
 else
 {
-    print STDERR $HELP;
+    &log($HELP);
 }
 
 #
@@ -242,7 +283,7 @@ sub flagstat
     my $ths      = shift;
     my $bam      = shift;
 
-    print STDERR "Making flagstat...";
+    &log("flagstat START at ###");
     open( FLAGSTAT, "$samtools flagstat -@ $ths $bam | " ) || die;
     my $flags = $bam;
     $flags =~ s/.bam$/.flagstat/i;
@@ -250,7 +291,7 @@ sub flagstat
     while (<FLAGSTAT>) { print FLAGOUT $_; }
     close FLAGOUT;
     close FLAGSTAT;
-    print STDERR "DONE.\n";
+    &log("flagstat END at ###");
 }
 
 #
@@ -288,8 +329,9 @@ sub bwa
     }
 
     # index with sambamba
-    print STDERR "Indexing...\n";
+    &log("Index START at ###");
     system( $SAMTOOLS, 'index', '-@' . $cpu, $dest );
+    &log("Index END at ###");
 }
 
 #
@@ -326,4 +368,174 @@ sub trimReads
     }
     close FOUT;
     close FIN;
+}
+
+#
+# FASTQC
+#
+sub fastqc
+{
+    my $f1     = shift;
+    my $f2     = shift;
+    my $dir    = shift;
+    my $noTrim = shift;
+    my $FASTQC = shift;
+
+    my @fastq = ();
+    if ( $dir ne '' )
+    {
+        chdir($dir);
+        foreach my $ff ( glob("*.fastq.gz"), glob("*.fq.gz") )
+        {
+            push @fastq, abs_path($ff);
+        }
+    }
+    push @fastq, $f1 if ( $f1 ne '' );
+    push @fastq, $f2 if ( $f2 ne '' );
+
+    if ( $noTrim > 0 )
+    {
+        my @run = ();
+        foreach my $f (@fastq)
+        {
+            push @run, $f if ( $f !~ m/trimmed..fastq.gz$/ );
+        }
+        @fastq = @run;
+    }
+
+    if ( defined $fastq[0] )
+    {
+        my @a = split '/', $fastq[0];
+        $a[-1] = 'fastqc';
+        my $dest = join '/', @a;
+        if ( -d $dest )
+        {
+
+            &log( $HELP . "Found directory fastqc. Nothing to do!!!\n" );
+            exit;
+        }
+
+        my $cpu = $#fastq + 1;
+
+        &log("FastQC START at ###");
+        &log(qq|     FastQC: $FASTQC|);
+        &log( qq|fastq files: | . ( join "; ", @fastq ) );
+        &log(qq|Destination: $dest\n---|);
+
+        mkdir($dest);
+        system( $FASTQC, '-t', $cpu, '-o', $dest, '-f', 'fastq', @fastq );
+        &log("FastQC END at ###");
+    }
+}
+
+#
+# fastp
+#
+sub fastp
+{
+    my $F1  = shift;
+    my $F2  = shift;
+    my $exe = shift;
+
+    my $DIR      = '';
+    my $ADAPTERS = q|>multiplexing-forward
+GATCGGAAGAGCACACGTCT
+>solexa-forward
+AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
+>truseq-forward-contam
+AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC
+>truseq-reverse-contam
+AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTA
+>nextera-forward-read-contam
+CTGTCTCTTATACACATCTCCGAGCCCACGAGAC
+>nextera-reverse-read-contam
+CTGTCTCTTATACACATCTGACGCTGCCGACGA
+>solexa-reverse
+AGATCGGAAGAGCGGTTCAGCAGGAATGCCGAG
+>PrefixNX/1
+AGATGTGTATAAGAGACAG
+>Trans1
+TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG
+>Trans2
+GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
+>PrefixPE/1
+AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT
+>PrefixPE/2
+CAAGCAGAAGACGGCATACGAGATCGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT
+>PCR_Primer1_rc
+AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT
+>PCR_Primer2_rc
+AGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATCTCGTATGCCGTCTTCTGCTTG
+>FlowCell1
+TTTTTTTTTTAATGATACGGCGACCACCGAGATCTACAC
+>FlowCell2
+TTTTTTTTTTCAAGCAGAAGACGGCATACGA
+>TruSeq2_SE
+AGATCGGAAGAGCTCGTATGCCGTCTTCTGCTTG
+>PrefixPE/1
+TACACTCTTTCCCTACACGACGCTCTTCCGATCT
+>PrefixPE/2
+GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT
+>MGI_adapter_forward
+AAGTCGGATCGTAGCCATGTCGTTCTGTGAGCCAAGGAGTTG
+>MGI_adapter_reverse
+AAGTCGGAGGCCAAGCGGTCTTAGGAAGACAA
+|;
+
+    if ( $F1 ne '' )
+    {
+        my @a = split '/', $F1;
+        pop @a;
+        $DIR = join '/', @a if ( $DIR eq '' );
+    }
+
+    if ( -f 'trimmed1.fastq.gz' )
+    {
+        &log( $HELP . "File trimmed1.fastq.gz already produced!\n" );
+        return;
+    }
+
+    open( ADAPT, '>adapters.fasta' ) || die;
+    print ADAPT $ADAPTERS;
+    close ADAPT;
+
+    &log("Fastp START on file $F1 $F2 at ###");
+
+    my @common = (
+        '--length_required', 36,
+        '--adapter_fasta',   'adapters.fasta',
+        '--cut_right',       '--cut_right_window_size',
+        4,                   '--cut_right_mean_quality',
+        15,                  '--trim_poly_g',
+        '--overrepresentation_analysis'
+    );
+
+    if ( $F2 eq '' )
+    {
+        system( $exe, '-w', 16, '-i', $F1, '-o', 'trimmed1.fastq.gz',
+            '--failed_out', 'failed.fastq.gz', @common );
+    }
+    else
+    {
+        system( $exe, '-w', 16,
+            '-i',              $F1,                 '-I',
+            $F2,               '-o',                'trimmed1.fastq.gz',
+            '-O',              'trimmed2.fastq.gz', '--failed_out',
+            'failed.fastq.gz', @common
+        );
+    }
+    unlink( 'adapters.fasta', 'failed.fastq.gz' );
+    &log("Fastp END at ###");
+}
+
+#
+# PRINT A LOG MESSAGE
+# String ### is replaced by the localtime sscalar
+#
+sub log
+{
+    my $message = shift;
+    my $date    = scalar(localtime);
+    $message =~ s/###/$date/;
+    print STDERR $message, "\n";
 }

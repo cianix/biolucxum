@@ -138,11 +138,42 @@ Example:
 ~~~~
 
 
-### addUMI
+### qtmWrap
 
-The script reads *bwa* output from STDIN and add the RX tag to each reads.
+qtmWrap is a wrapper for q(uality) control with **FastQC**, t(rim) and filtering of
+fastq files with **fastp** and m(apping) with **BWA-mem**.
+
+~~~~
+SYNTAX:
+
+FastQC wrapper
+--------------
+ > qtmWrap fastqc [-fastqc <path>] [-noTrim] <file1.fastq.gz> [file2.fastq.gz]
+ > qtmWrap fastqc [-fastqc <path>] [-noTrim] <fastqDir>
+
+fastp wrapper
+-------------
+ > qtmWrap fastp [-fastp <path>] <file1.fastq.gz> [file2.fastq.gz]
+
+BWA-mem wrapper
+---------------
+ > qtmWrap map [-bwa <path>] [-samtools <path>] <ref.fasta> <file1.fastq[.gz]> [file2.fastq[.gz]] <#CPU>
+ > qtmWrap map <ref.fasta> <file1.fastq[.gz]> [file2.fastq[.gz]] [umi.fastq[.gz]] <#CPU>
+
+ > bwa mem <ref.fasta> <read1.fastq.gz> <read2.fastq.gz> | qtmWrap <readUMI.fastq.gz> > map.sam
+
+NOTE: UMI fastq file is accepted as third fastq input
 The script takes the UMI sequences from a fastq.gz file. The Fastq files used as input
 in BWA must have the same order than the UMI fastq file.
+
+To trim reads length in fastq file
+----------------------------------
+ > qtmWrap trimReads <file.fastq> <length>
+~~~~
+
+qtmWrap uses the executable of each program in the $PATH directories, but
+the user can set a specific version of each program by the available
+flag (Eg. -bwa "path/bwa" for bwa).
 
 The script can also be used as a wrapper to the BWA command and to trim the reads to
 a given length.
