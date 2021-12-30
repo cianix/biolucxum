@@ -36,7 +36,7 @@ $cmd =~ s/^.*\///;
 
 my $HELP =
   qq{---------------------------------------------------------------------------
-$cmd version 0.2.0 (Dec 28, 2021)
+$cmd version 0.2.1 (Dec 30, 2021)
 Copyright 2019-2021 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -54,8 +54,7 @@ fastp wrapper
 
 BWA-mem wrapper
 ---------------
- > $cmd map [-bwa <path>] [-samtools <path>] <ref.fasta> <file1.fastq[.gz]> [file2.fastq[.gz]] <#CPU>
- > $cmd map <ref.fasta> <file1.fastq[.gz]> [file2.fastq[.gz]] [umi.fastq[.gz]] <#CPU>
+ > $cmd map [-bwa <path>] [-samtools <path>] [-o dest.bam] <ref.fasta> <file1.fastq[.gz]> [file2.fastq[.gz]] [umi.fastq[.gz]] <#CPU>
 
  > bwa mem <ref.fasta> <read1.fastq.gz> <read2.fastq.gz> | $cmd <readUMI.fastq.gz> > map.sam
 
@@ -145,7 +144,7 @@ foreach my $file (@ARGV)
             $FASTP = abs_path($file);
         }
     }
-    elsif ( $file =~ m/.bam$/ && !-f $file )
+    elsif ( $file =~ m/.bam$/ && $old eq '-o' )
     {
         $outFile = $file;
     }
@@ -160,46 +159,16 @@ foreach my $file (@ARGV)
     $old = $file;
 }
 
+#
+# manage out file
+#
+$outFile = 'start_sorted.bam' if ( $outFile eq '' );
+
 if ( $mapBWA > 0 && $f1 ne '' && $FASTA ne '' )
 {
-    #
-    # manage thread
-    #
-    if ( $cpu < 1 )
-    {
-        open( PROC, '/proc/cpuinfo' )
-          || die "Can't open /proc/cpuinfo file\n\n";
-        while (<PROC>) { $cpu++ if (m/processor\s*:\s*\d/); }
-        close PROC;
-    }
-
-    #
-    # manage out file
-    #
-    $outFile = 'start_sorted.bam' if ( $outFile eq '' );
-    if ( -f $outFile )
-    {
-        &log( $HELP . "$outFile was already created!\n" );
-        exit;
-    }
-
-    my $hostname = hostname;
-
     my @tt   = split /\//, $f1;
     my $NAME = $tt[-2];
     my $ID   = time;
-
-    &log( "BWA started on $hostname at " . scalar( localtime() ) );
-    &log(
-        qq|
-FASTQ1: $f1
-FASTQ2: $f2
-   UMI: $umi
-   REF: $FASTA
-  NAME: $NAME
-    ID: $ID
-   CPU: $cpu in $hostname|
-    );
 
     &bwa(
         $BWA,   $SAMTOOLS, $addUMI, $cpu, $ID, $NAME,
@@ -207,8 +176,6 @@ FASTQ2: $f2
     );
 
     &flagstat( $SAMTOOLS, $cpu, $outFile );
-
-    &log( "BWA finished on $hostname at " . scalar( localtime() ) );
 }
 elsif ( $trim > 0 && -f $f1 && $f2 eq '' && $cpu > 0 )
 {
@@ -311,6 +278,37 @@ sub bwa
     my $f2       = shift;
     my $umi      = shift;
 
+    # check for existing out file
+    if ( -f $outFile )
+    {
+        &log( $HELP . "$outFile was already created!\n" );
+        exit;
+    }
+
+    #
+    # manage thread and hostname
+    #
+    my $hostname = hostname;
+    if ( $cpu < 1 )
+    {
+        open( PROC, '/proc/cpuinfo' )
+          || die "Can't open /proc/cpuinfo file\n\n";
+        while (<PROC>) { $cpu++ if (m/processor\s*:\s*\d/); }
+        close PROC;
+    }
+
+    &log( "BWA started on $hostname at " . scalar( localtime() ) );
+    &log(
+        qq|
+FASTQ1: $f1
+FASTQ2: $f2
+   UMI: $umi
+   REF: $FASTA
+  NAME: $NAME
+    ID: $ID
+   CPU: $cpu in $hostname|
+    );
+
     my $RG = join "\\t", '"@RG', "ID:$ID", 'PU:lane', "LB:$NAME", "SM:$NAME",
       'CN:PersonalGenomics', 'PL:ILLUMINA"';
 
@@ -327,6 +325,7 @@ sub bwa
         $bcpu--;
 `$BWA mem -R $RG -t $bcpu $FASTA $f1 $f2 | $addUMI $umi | $SAMTOOLS sort --threads $scpu - -o $dest`;
     }
+    &log( "BWA finished on $hostname at " . scalar( localtime() ) );
 
     # index with sambamba
     &log("Index START at ###");
@@ -350,6 +349,8 @@ sub trimReads
     {
         open( FIN, $fastq ) || die;
     }
+
+    &log("Trim reads length START at ###");
     my $dest = $fastq;
     $dest =~ s/.fastq/-trim$len.fastq/;
     $dest =~ s/.fq/-trim$len.fq/;
@@ -368,6 +369,7 @@ sub trimReads
     }
     close FOUT;
     close FIN;
+    &log("Trim reads length END at ###");
 }
 
 #
@@ -436,6 +438,7 @@ sub fastp
     my $F1  = shift;
     my $F2  = shift;
     my $exe = shift;
+    my $cpu = shift;
 
     my $DIR      = '';
     my $ADAPTERS = q|>multiplexing-forward
@@ -502,27 +505,24 @@ AAGTCGGAGGCCAAGCGGTCTTAGGAAGACAA
     &log("Fastp START on file $F1 $F2 at ###");
 
     my @common = (
-        '--length_required', 36,
-        '--adapter_fasta',   'adapters.fasta',
-        '--cut_right',       '--cut_right_window_size',
-        4,                   '--cut_right_mean_quality',
-        15,                  '--trim_poly_g',
-        '--overrepresentation_analysis'
+        '--length_required',             36,
+        '--adapter_fasta',               'adapters.fasta',
+        '--cut_right',                   '--cut_right_window_size',
+        4,                               '--cut_right_mean_quality',
+        15,                              '--trim_poly_g',
+        '--overrepresentation_analysis', '-w',
+        $cpu
     );
 
     if ( $F2 eq '' )
     {
-        system( $exe, '-w', 16, '-i', $F1, '-o', 'trimmed1.fastq.gz',
-            '--failed_out', 'failed.fastq.gz', @common );
+        system( $exe, '-i', $F1, '-o', 'trimmed1.fastq.gz', '--failed_out',
+            'failed.fastq.gz', @common );
     }
     else
     {
-        system( $exe, '-w', 16,
-            '-i',              $F1,                 '-I',
-            $F2,               '-o',                'trimmed1.fastq.gz',
-            '-O',              'trimmed2.fastq.gz', '--failed_out',
-            'failed.fastq.gz', @common
-        );
+        system( $exe, '-i', $F1, '-I', $F2, '-o', 'trimmed1.fastq.gz', '-O',
+            'trimmed2.fastq.gz', '--failed_out', 'failed.fastq.gz', @common );
     }
     unlink( 'adapters.fasta', 'failed.fastq.gz' );
     &log("Fastp END at ###");
