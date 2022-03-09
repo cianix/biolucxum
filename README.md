@@ -45,6 +45,20 @@ A first release of this program is available at
 https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0132180
 
 
+### vcf2multi
+
+The script merges variants from several VCFs and prints out a multi sample VCF.
+
+The script is very simple:
+
+- the multiVCF has the same header than the first VCF
+- info field is replaced by a dot
+- the GT fields in output are only GT, AD, DP, AF
+- The reference genotypes are ignored: empty genotype in output file
+
+The script is used to annotate all the VCF variants in a set of unrelated samples
+
+
 ### vcf2table
 
 Parse the VCF file and create a table with CHR, POSITION, REFERENCE ALLELE, ALTERNATIVE ALLELE(s), GENOTYPE(s).

@@ -1,0 +1,328 @@
+#!/usr/bin/perl
+
+#
+# Copyright 2022 Luciano Xumerle. All rights reserved.
+# Luciano Xumerle <luciano.xumerle@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+use Cwd 'abs_path';
+
+my $cmd = $0;
+$cmd =~ s/^.*\///;
+print STDERR
+  qq{---------------------------------------------------------------------------
+$cmd version 0.0.1 (Mar 9, 2022)
+Copyright 2022 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+This is free software; see the source for copying conditions. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+---------------------------------------------------------------------------
+
+SYNTAX:
+
+ > $cmd <file1.vcf[.gz]> <file2.vcf[.gz]> ... <fileN.vcf[.gz]> > multi.vcf
+
+};
+
+# save information
+# hash: chr -> pos -> reference -> sample -> allele = allelic depth
+my %var = ();
+
+# save header lines
+my @header = ();
+
+# save the sample name
+my %samples = ();
+
+# save the list of vcf to merge
+my @VCF = ();
+
+# parse argument
+foreach my $f (@ARGV)
+{
+    if ( -f $f )
+    {
+        push @VCF, $f if ( $f =~ m/.vcf$/i || $f =~ m/.vcf.gz$/i );
+    }
+}
+
+#
+# parse all the VCFs to store variants in %var
+#
+foreach my $vcf (@VCF)
+{
+    # open file
+    if ( $vcf =~ m/gz$/ )
+    {
+        open( VCF, "gzip -dc \"$vcf\" | " ) || die;
+    }
+    else
+    {
+        open( VCF, $vcf ) || die;
+    }
+    print STDERR qq|Read $vcf\n|;
+
+    # array used to store header columns in current VCFs
+    my @sss = ();
+    while (<VCF>)
+    {
+        chomp;
+
+        # the VCF header will be equal to the first VCF header
+        if (m/^#/)
+        {
+            if (m/^#CHROM/)
+            {
+                my @a = split /\t/;
+                @sss = split /\t/;
+                for ( my $i = 9 ; $i <= $#a ; $i++ )
+                {
+                    $samples{ $a[$i] } = 1;
+                }
+                if ( $header[-1] !~ m/^#CHROM/ )
+                {
+                    while ( $#a > 8 ) { pop @a; }
+                    push @header, join "\t", @a;
+                }
+            }
+            next if ( defined $header[-1] && $header[-1] =~ m/^#CHROM/ );
+            push @header, $_;
+        }
+
+        # parse lines after the header
+        else
+        {
+            my @a = split "\t";
+            next if ( $a[6] ne 'PASS' );
+
+            # loop on samples genptypes
+            for ( my $i = 9 ; $i <= $#a ; $i++ )
+            {
+                $var{ $a[0] }->{ $a[1] }->{ $a[3] }->{ $sss[$i] } =
+                  &getDPfreq( $a[3], $a[4], $a[8], $a[$i] );
+            }
+        }
+    }
+    close VCF;
+}
+
+# save samples name
+my @sss = ();
+
+# print header
+print join "\n", @header;
+foreach my $f ( sort keys %samples )
+{
+    print "\t", $f;
+    push @sss, $f;
+}
+print "\n";
+
+# print VCF lines
+# get chromosome names from the header
+foreach my $h (@header)
+{
+    if ( $h =~ m/##contig=<ID=(.+),length/ )
+    {
+        my $chr = $1;
+        next if ( !defined $var{$chr} );
+
+        # get all the position on the chromosome
+        foreach my $pos ( sort { $a <=> $b } keys %{ $var{$chr} } )
+        {
+            # get all the stored reference alleles for the position
+            foreach my $ref ( sort keys %{ $var{$chr}->{$pos} } )
+            {
+                # the first part of the line will be...
+                my @row = ( $chr, $pos, '.', $ref );
+
+                # get alternative list from samples
+                my @alle = ();
+                my %aa   = ();
+
+                # loop on samples name
+                foreach my $ss (@sss)
+                {
+                    foreach
+                      my $a ( keys %{ $var{$chr}->{$pos}->{$ref}->{$ss} } )
+                    {
+                        # "GTF" is used to store the genotype of the sample
+                        $aa{$a} = 1 if ( $a ne $ref && $a ne 'GTF' );
+                    }
+                }
+                @alle = sort keys %aa;
+
+                # complete the fixed part of the line
+                my $alt = join ',', @alle;
+                push @row, $alt;
+                push @row, '.';
+                push @row, 'PASS';
+
+                # skip the info TAG
+                push @row, '.';
+
+                # save only information available in all the VCFs (I hope...)
+                push @row, 'GT:AD:DP:AF';
+
+                # add the reference to the list of alleles
+                unshift @alle, $ref;
+
+                # prepare the GT fields...
+                # the script calculates DP from the allelic depth
+                # and then the allelic frequencies
+                # Computation is longer but less memory is used to store values
+                foreach my $ss (@sss)
+                {
+                    my $dp = 0;
+                    my @ad = ();
+                    my @af = ();
+                    if ( defined $var{$chr}->{$pos}->{$ref}->{$ss} )
+                    {
+                        my %freq = %{ $var{$chr}->{$pos}->{$ref}->{$ss} };
+
+                        # calculate DP processing all the alleles
+                        foreach my $a (@alle)
+                        {
+                            if ( defined $freq{$a} )
+                            {
+                                push @ad, $freq{$a};
+                                $dp += $freq{$a};
+                            }
+                            else
+                            {
+                                push @ad, 0;
+                            }
+                        }
+
+                        # calculate AFs for loci with a valid "GTF" ...
+                        if ( $dp > 0 && defined $freq{'GTF'} )
+                        {
+                            my $ads = join ',', @ad;
+
+                            # save GT position on alleles list
+                            my @ggtt = ();
+                            for ( my $i = 0 ; $i <= $#alle ; $i++ )
+                            {
+                                push @af, $ad[$i] / $dp;
+                                foreach my $all ( @{ $freq{'GTF'} } )
+                                {
+                                    push @ggtt, $i if ( $alle[$i] eq $all );
+                                }
+                            }
+
+                            # prepare GT
+                            my $ggg = join '/', @ggtt;
+
+                            # remove the reference allele frequency
+                            shift @af;
+
+                            # prepare allele frequencies field
+                            my $afs = join ",", @af;
+                            my $gt = join ':', $ggg, $ads, $dp, $afs;
+                            push @row, $gt;
+                        }
+
+                        # ... or set as empty GT
+                        else
+                        {
+                            push @row, './.:.:.:.';
+                        }
+                    }
+                    else
+                    {
+                        push @row, './.:.:.:.';
+                    }
+                }
+                print join( "\t", @row ), "\n";
+            }
+        }
+    }
+}
+
+#
+# get AD hash
+#
+# $freq->{ allele } = AllelicDepth
+# $freq->{ "GTF" } = [ list of alleles in genotype ]
+#
+sub getDPfreq
+{
+    my $ref  = shift;
+    my $alt  = shift;
+    my $gts  = shift;
+    my $vals = shift;
+
+    # mi prendo lista di alleli e i campi GT
+    my @alle = split ',', $ref . ',' . $alt;
+    my @gt   = split ':', $gts;
+    my @val  = split ':', $vals;
+
+    # empty hash if not a variant
+    # NO REFERENCE GENOTYPE ARE REPORTED!!!
+    return {} if ( $val[0] !~ m/[123456789]/ );
+
+    # list of alleles in genotype
+    my @geno = ();
+    foreach my $n ( split /[\/\|]/, $val[0] )
+    {
+        push @geno, $alle[$n] if ( $n =~ m/^\d$/ && defined $alle[$n] );
+    }
+
+    # initialize the hash
+    my %freq = ( 'GTF' => \@geno );
+    for ( my $i = 0 ; $i <= $#alle ; $i++ )
+    {
+        $freq{ $alle[$i] } = 0;
+    }
+
+    # look for DP AD and AF fields
+    my $dp = 0;
+    my @af = (-1);
+    my @ad = (0);
+
+    for ( my $i = 1 ; $i <= $#gt ; $i++ )
+    {
+        last if ( !defined $val[$i] );
+        $dp = $val[$i] if ( $gt[$i] eq 'DP' );
+        @af = split ',', $val[$i] if ( $gt[$i] eq 'AF' );
+        @ad = split ',', $val[$i] if ( $gt[$i] eq 'AD' );
+    }
+
+    # if no DP we return empty hash
+    if ( $dp < 1 ) { return {}; }
+    if ( $#ad == $#alle )
+    {
+        for ( my $i = 0 ; $i <= $#alle ; $i++ )
+        {
+            $freq{ $alle[$i] } = $ad[$i];
+        }
+        return \%freq;
+    }
+
+    if ( $#af + 1 == $#alle && $dp > 0 )
+    {
+        my $altDP = 0;
+        for ( my $i = 1 ; $i <= $#alle ; $i++ )
+        {
+            $freq{ $alle[$i] } = int( $af[ $i - 1 ] * $dp );
+            $altDP = $freq{ $alle[$i] };
+        }
+        $freq{ $alle[0] } = $dp - $altDP;
+        return \%freq;
+    }
+    return {};
+}

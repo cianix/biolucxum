@@ -24,7 +24,7 @@ my $cmd = $0;
 $cmd =~ s/^.*\///;
 print STDERR
   qq{---------------------------------------------------------------------------
-$cmd version 0.0.4 (Mar 30, 2021)
+$cmd version 0.0.5 (Oct 19, 2021)
 Copyright 2018-2021 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -74,7 +74,7 @@ if ( $tex + $md + $dw + $ht == 0 )
 my @lines = ();
 my %ln    = ();
 
-&loadTSV( $ARGV[0] );
+&loadTSV($tsv);
 
 if ( $ht > 0 )
 {
@@ -179,7 +179,6 @@ sub tsv2html
     {
         push @out, '<tr><td>' . ( join '</td><td>', @$r ) . '</td></tr>';
     }
-    close TSVTSV;
     push @out, '</table>';
     print join "\n", @out, '';
 }
