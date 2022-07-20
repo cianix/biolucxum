@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Copyright 2020 Luciano Xumerle. All rights reserved.
+# Copyright 2020-2022 Luciano Xumerle. All rights reserved.
 # Luciano Xumerle <luciano.xumerle@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -27,7 +27,7 @@ my $cmd = $0;
 $cmd =~ s/^.*\///;
 print STDERR
   qq{---------------------------------------------------------------------------
-$cmd version 0.0.1 (Jul 1, 2020)
+$cmd version 0.0.2 (Jul 20, 2022)
 Copyright 2020 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -40,15 +40,16 @@ SYNTAX:
 
 exit if ( !defined $ARGV[1] );
 
-my %vcf = ();
-my %ref = ();
-my @row = ();
+my %vcf     = ();
+my %ref     = ();
+my @samples = ();
+my @row     = ();
 foreach my $f (@ARGV)
 {
     if ( $f =~ m/vcf.gz$/i ) { open( FILE, "gzip -dc $f | " ) || die; }
     elsif ( $f =~ m/vcf$/i ) { open( FILE, $f ) || die; }
 
-    push @row, $f;
+    push @samples, $f;
 
     while (<FILE>)
     {
@@ -56,13 +57,16 @@ foreach my $f (@ARGV)
         next if ( m/^#/ || !m/\tPASS\t/ );
 
         my @a = split /\t/;
-        $ref{ $a[0] }->{ $a[1] } = $a[3];
+
+        # ref bp in position
+        $ref{ $a[0] }->{ $a[1] } = substr( $a[3], 0, 1 );
         $vcf{ $a[0] }->{ $a[1] }->{$f} = join '/',
           @{ &vcfAllele( $a[3], $a[4], $a[9] ) };
     }
     close FILE;
 }
 
+@row = ();
 for ( my $i = 0 ; $i < $#ARGV ; $i++ )
 {
     for ( my $j = $i + 1 ; $j <= $#ARGV ; $j++ )
@@ -70,7 +74,11 @@ for ( my $i = 0 ; $i < $#ARGV ; $i++ )
         push @row, $i . '-' . $j;
     }
 }
-print join( "\t", 'chr', 'pos', @row ), "\n";
+print join( "\t", 'chr', 'pos', 'REF', @samples, @row ), "\n";
+
+# count position for the finel stats
+my $tot = 0;
+my $no  = 0;
 
 foreach my $chr ( sort keys %vcf )
 {
@@ -88,14 +96,24 @@ foreach my $chr ( sort keys %vcf )
         {
             for ( my $j = $i + 1 ; $j < $len + 1 ; $j++ )
             {
+                $tot++;
                 my $t = 'OK';
-                $t = 'NO' if ( $row[$i] ne $row[$j] );
+                if ( $row[$i] ne $row[$j] )
+                {
+                    $t = 'NO';
+                    $no++;
+                }
                 push @row, $t;
             }
         }
         print join( "\t", $chr, $pos, $ref{$chr}->{$pos}, @row ), "\n";
     }
 }
+
+# print results
+print "----SUMMARY----\n";
+print join( "\t", "TOT POS", "ERR", "PERC ERR" ), "\n";
+print join( "\t", $tot, $no, $no / $tot * 100 ), "\n";
 
 #
 # set the allele positions for vcf column 10
