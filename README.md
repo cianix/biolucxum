@@ -193,6 +193,12 @@ The script can also be used as a wrapper to the BWA command and to trim the read
 a given length.
 
 
+### getPassRegions
+
+A bash pipeline that uses samtools, bedtools and awk to produce a BED file of *good regions* from a given BAM file.
+The BED file contains the regions that have less than the 10% of reads with mapping quality equal to 0 with a given min depth (default is 4).
+
+
 ### insertSize
 
 Calcute the BAM mean insert size using a subset of reads.
