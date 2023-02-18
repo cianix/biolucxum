@@ -1,7 +1,7 @@
-#!/usr/bin/perl
+#!/usr/bin/python3
 
 #
-# Copyright 2018 Luciano Xumerle. All rights reserved.
+# Copyright 2023 Luciano Xumerle. All rights reserved.
 # Luciano Xumerle <luciano.xumerle@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -18,41 +18,28 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-use strict;
-use warnings;
+import sys
+import re
 
-my $cmd = $0;
-$cmd =~ s/^.*\///;
-print STDERR
-  qq{---------------------------------------------------------------------------
-$cmd version 0.0.1 (Oct 13, 2018)
-Copyright 2018 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+syntax="""---------------------------------------------------------------------------
+extract_variants - version 0.0.1 (Feb 18, 2023)
+Copyright 2023 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ---------------------------------------------------------------------------
 SYNTAX:
- >  cat file.vcf | $cmd > dest.vcf
-};
+ - extract_variants < file.vcf > dest.vcf (more fast)
+ - cat file.vcf | extract_variants > dest.vcf"""
+print( syntax, file=sys.stderr  )
 
-while (<STDIN>)
-{
-    chomp;
 
-    # PRINT HEADER
-    if (m/^#/)
-    {
-        print $_, "\n";
-    }
-    else
-    {
-        next if ( !m/\tPASS\t/  );
-        my @a = split "\t";
+rr=re.compile ( "[123456789]" )
+dd=re.compile ( ":" )
 
-        # NO ALTERNATIVE ALLELES
-        next if ( $a[4] eq '.' );
-
-        # PARSE GT TO SEARCH ALTERNATIVE ALLELES
-        @a = split ':', $a[9];
-        print $_, "\n" if ( $a[0] =~ m/[123456789]/ );
-    }
-}
+for line in sys.stdin:
+    line = line.strip()
+    if line.startswith("#"):
+        print( line )
+    else:
+        if "\tPASS\t" in line and rr.search( line.split("\t")[9].split(":")[0] ):
+            print(line)
