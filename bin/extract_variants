@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 
 #
 # Copyright 2023 Luciano Xumerle. All rights reserved.
@@ -22,16 +22,16 @@ import sys
 import re
 
 syntax="""---------------------------------------------------------------------------
-extract_variants - version 0.0.1 (Feb 18, 2023)
+extract_variants - version 0.0.2 (Mar 1, 2023)
 Copyright 2023 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ---------------------------------------------------------------------------
 SYNTAX:
  - extract_variants < file.vcf > dest.vcf (more fast)
- - cat file.vcf | extract_variants > dest.vcf"""
-print( syntax, file=sys.stderr  )
-
+ - cat file.vcf | extract_variants > dest.vcf
+"""
+sys.stderr.write( syntax )
 
 rr=re.compile ( "[123456789]" )
 dd=re.compile ( ":" )
