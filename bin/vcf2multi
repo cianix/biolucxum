@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 #
-# Copyright 2022 Luciano Xumerle. All rights reserved.
+# Copyright 2022-2023 Luciano Xumerle. All rights reserved.
 # Luciano Xumerle <luciano.xumerle@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -26,8 +26,8 @@ my $cmd = $0;
 $cmd =~ s/^.*\///;
 print STDERR
   qq{---------------------------------------------------------------------------
-$cmd version 0.0.2 (Sep 29, 2022)
-Copyright 2022 by Luciano Xumerle <luciano.xumerle\@gmail.com>
+$cmd version 0.0.5 (Sep 16, 2023)
+Copyright 2022-2023 by Luciano Xumerle <luciano.xumerle\@gmail.com>
 This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ---------------------------------------------------------------------------
@@ -43,15 +43,22 @@ SYNTAX:
 my %var = ();
 
 # save header lines
+# chr -> pos -> ref -> alt = 1
 my @header = ();
 
 # save the sample name
+# ID -> chr -> pos -> ref = hash
+my %geno = ();
+
+# store id of samples
 my %samples = ();
+
+# save vcf variants alleles in population
 
 # save the list of vcf to merge
 my @VCF = ();
 
-# parse argument
+# parse argument: get VCFs list
 foreach my $f (@ARGV)
 {
     if ( -f $f )
@@ -78,11 +85,12 @@ foreach my $vcf (@VCF)
 
     # array used to store header columns in current VCFs
     my @sss = ();
+
     while (<VCF>)
     {
         chomp;
 
-        # the VCF header will be equal to the first VCF header
+       # the final multi sample VCF header will be equal to the first VCF header
         if (m/^#/)
         {
             if (m/^#CHROM/)
@@ -109,18 +117,25 @@ foreach my $vcf (@VCF)
             my @a = split "\t";
             next if ( $a[6] ne 'PASS' );
 
-            # loop on samples genptypes
+            # loop on samples genotypes
             for ( my $i = 9 ; $i <= $#a ; $i++ )
             {
-                $var{ $a[0] }->{ $a[1] }->{ $a[3] }->{ $sss[$i] } =
+                # save genotype for each ID
+                $geno{ $sss[$i] }->{ $a[0] }->{ $a[1] }->{ $a[3] } =
                   &getDPfreq( $a[3], $a[4], $a[8], $a[$i] );
+
+                # update the list of alternative alleles
+                foreach my $al ( split ',', $a[4] )
+                {
+                    $var{ $a[0] }->{ $a[1] }->{ $a[3] }->{$al} = 1;
+                }
             }
         }
     }
     close VCF;
 }
 
-# save samples name
+# save samples ID
 my @sss = ();
 
 # print header
@@ -151,20 +166,7 @@ foreach my $h (@header)
                 my @row = ( $chr, $pos, '.', $ref );
 
                 # get alternative list from samples
-                my @alle = ();
-                my %aa   = ();
-
-                # loop on samples name
-                foreach my $ss (@sss)
-                {
-                    foreach
-                      my $a ( keys %{ $var{$chr}->{$pos}->{$ref}->{$ss} } )
-                    {
-                        # "GTF" is used to store the genotype of the sample
-                        $aa{$a} = 1 if ( $a ne $ref && $a ne 'GTF' );
-                    }
-                }
-                @alle = sort keys %aa;
+                my @alle = sort keys %{ $var{$chr}->{$pos}->{$ref} };
 
                 # complete the fixed part of the line
                 my $alt = join ',', @alle;
@@ -172,9 +174,10 @@ foreach my $h (@header)
                 push @row, '.';
                 push @row, 'PASS';
 
-                # skip the info TAG
+                # set the info TAG as "."
                 push @row, '.';
 
+                # prepare GT string
                 # save only information available in all the VCFs (I hope...)
                 push @row, 'GT:AD:DP:AF';
 
@@ -185,14 +188,15 @@ foreach my $h (@header)
                 # the script calculates DP from the allelic depth
                 # and then the allelic frequencies
                 # Computation is longer but less memory is used to store values
+                # loop on samples ID
                 foreach my $ss (@sss)
                 {
                     my $dp = 0;
                     my @ad = ();
                     my @af = ();
-                    if ( defined $var{$chr}->{$pos}->{$ref}->{$ss} )
+                    if ( defined $geno{$ss}->{$chr}->{$pos}->{$ref} )
                     {
-                        my %freq = %{ $var{$chr}->{$pos}->{$ref}->{$ss} };
+                        my %freq = %{ $geno{$ss}->{$chr}->{$pos}->{$ref} };
 
                         # calculate DP processing all the alleles
                         foreach my $a (@alle)
@@ -326,9 +330,10 @@ sub getDPfreq
         for ( my $i = 1 ; $i <= $#alle ; $i++ )
         {
             $freq{ $alle[$i] } = int( $af[ $i - 1 ] * $dp );
-            $altDP = $freq{ $alle[$i] };
+            $altDP += $freq{ $alle[$i] };
         }
-        $freq{ $alle[0] } = $dp - $altDP;
+        $freq{ $alle[0] } = 0;
+        $freq{ $alle[0] } = $dp - $altDP if ( $dp - $altDP > 0 );
         return \%freq;
     }
     return {};
